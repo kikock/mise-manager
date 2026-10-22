@@ -2,11 +2,12 @@
   "name": "mise-manager",
   "version": "1.0.0",
   "description": "Windows 11 风格的 mise 版本管理器桌面应用",
+  "author": "caokui <34462958@qq.com>",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
     "dev": "electron . --dev",
-    "build": "electron-builder --win nsis --x64"
+    "build": "electron-builder --win nsis --x64 --publish never"
   },
   "devDependencies": {
     "electron": "^32.0.0",
@@ -15,6 +16,11 @@
   "build": {
     "appId": "com.misemanager.app",
     "productName": "mise-manager",
+    "publish": {
+      "provider": "github",
+      "owner": "kikock",
+      "repo": "mise-manager"
+    },
     "directories": {
       "output": "dist"
     },

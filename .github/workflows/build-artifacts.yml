@@ -107,7 +107,9 @@ jobs:
         run: yarn install --immutable
 
       - name: Build Application (Windows NSIS)
-        run: yarn build
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: yarn build --publish never
 
       - name: Validate Windows Artifacts
         shell: pwsh
