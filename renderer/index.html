@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mise Manager — Windows 11 版本管理器</title>
+  <meta name="description" content="mise 工具版本管理器 — 安装、浏览应用市场、管理已安装工具">
+  <link rel="stylesheet" href="css/fluent.css">
+  <link rel="stylesheet" href="css/layout.css">
+  <link rel="stylesheet" href="css/components.css">
+</head>
+<body>
+<div id="app">
+
+  <!-- ── 自定义标题栏 ── -->
+  <div id="titlebar">
+    <div class="titlebar-left">
+      <img src="assets/icon.png" alt="logo" style="width:20px;height:20px;border-radius:4px;object-fit:cover;flex-shrink:0" />
+      <span class="titlebar-title" style="font-weight:600">mise-manager</span>
+      <span class="badge badge-neutral" style="font-size:10.5px;padding:2px 6px">Win11</span>
+    </div>
+    <div class="titlebar-controls">
+      <button class="title-btn" id="btn-theme-toggle" title="切换深色/浅色主题" style="font-size:13px">
+        <span id="theme-toggle-icon">🌙</span>
+      </button>
+      <button class="title-btn" id="btn-minimize" title="最小化">
+        <svg viewBox="0 0 12 12" fill="none"><path d="M1 6h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+      </button>
+      <button class="title-btn" id="btn-maximize" title="最大化">
+        <svg viewBox="0 0 12 12" fill="none"><rect x="1" y="1" width="10" height="10" rx="1.5" stroke="currentColor" stroke-width="1.5"/></svg>
+      </button>
+      <button class="title-btn close-btn" id="btn-close" title="关闭">
+        <svg viewBox="0 0 12 12" fill="none"><path d="M1 1l10 10M11 1L1 11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- ── 主体 ── -->
+  <div id="main-container">
+
+    <!-- ── 侧边导航 ── -->
+    <nav id="sidebar">
+      <div class="nav-item active" data-page="home" id="nav-home">
+        <span class="nav-icon">🏠</span>
+        <span class="nav-label">主页</span>
+      </div>
+      <div class="nav-item" data-page="market" id="nav-market">
+        <span class="nav-icon">🏪</span>
+        <span class="nav-label">应用市场</span>
+        <span class="nav-badge" id="market-count">-</span>
+      </div>
+      <div class="nav-item" data-page="installed" id="nav-installed">
+        <span class="nav-icon">📦</span>
+        <span class="nav-label">已安装</span>
+        <span class="nav-badge" id="installed-count" style="display:none">0</span>
+      </div>
+      <div class="sidebar-divider"></div>
+      <div class="sidebar-section-label">系统</div>
+      <div class="nav-item" data-page="settings" id="nav-settings">
+        <span class="nav-icon">⚙️</span>
+        <span class="nav-label">设置</span>
+      </div>
+    </nav>
+
+    <!-- ── 内容区 ── -->
+    <main id="content">
+
+      <!-- ══════════════════ 首页 ══════════════════ -->
+      <section class="page active" id="page-home">
+        <div class="page-header">
+          <h1 class="page-title">欢迎使用 Mise Manager</h1>
+          <p class="page-subtitle">开发工具版本管理器 — 一站式安装、更新、切换工具版本</p>
+        </div>
+
+        <!-- mise 状态卡 -->
+        <div class="card mb-16" id="mise-status-card">
+          <div class="card-header">
+            <div>
+              <div class="card-title">mise 运行时状态</div>
+              <div class="card-subtitle">检测本机 mise 安装情况</div>
+            </div>
+            <button class="btn btn-ghost btn-sm" id="btn-refresh-status">🔄 刷新状态</button>
+          </div>
+          <div id="mise-status-content">
+            <div class="flex gap-12" style="align-items:center">
+              <div class="skeleton" style="width:52px;height:52px;border-radius:12px;flex-shrink:0"></div>
+              <div style="flex:1">
+                <div class="skeleton" style="height:14px;width:80px;margin-bottom:8px"></div>
+                <div class="skeleton" style="height:22px;width:160px"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 快速操作 -->
+        <div class="grid-2 mb-16" id="quick-actions" style="display:none">
+          <!-- 未安装状态显示 -->
+          <div class="card" id="card-install-mise" style="display:none">
+            <div class="card-title" style="margin-bottom:8px">📥 安装 mise 运行时</div>
+            <p style="font-size:12.5px;color:var(--text-secondary);margin-bottom:12px">
+              检测到未安装 mise，可直接一键安装到指定目录。
+            </p>
+            <!-- 安装目录预览 -->
+            <div style="background:rgba(0,0,0,0.3);border-radius:8px;padding:10px 12px;margin-bottom:12px;font-family:var(--font-mono);font-size:11.5px;color:var(--text-secondary)">
+              <div style="color:var(--text-tertiary);margin-bottom:4px;font-size:10px;">预定安装目录 (MISE_DATA_DIR)</div>
+              <div id="install-dir-preview" style="color:var(--accent);word-break:break-all">-</div>
+            </div>
+            <div class="flex gap-8">
+              <button class="btn btn-primary" id="btn-install-mise">🚀 立即安装 mise</button>
+              <button class="btn btn-ghost btn-sm" id="btn-change-install-dir">📂 自定义路径</button>
+            </div>
+          </div>
+
+          <!-- 已安装状态显示 -->
+          <div class="card" id="card-upgrade-mise" style="display:none">
+            <div class="card-title" style="margin-bottom:8px">⬆️ 升级与维护 mise 核心</div>
+            <p style="font-size:12.5px;color:var(--text-secondary);margin-bottom:14px">
+              升级到官方最新版本或在需要时安全彻底卸载 mise 核心与本地数据
+            </p>
+            <div class="flex gap-8">
+              <button class="btn btn-secondary btn-sm" id="btn-upgrade-mise">⬆️ 升级到最新版本</button>
+              <button class="btn btn-danger btn-sm" id="btn-uninstall-mise-home">🗑️ 卸载 mise</button>
+            </div>
+          </div>
+
+          <div class="card" id="card-open-config" style="display:none">
+            <div class="card-title" style="margin-bottom:8px">📁 mise 数据目录</div>
+            <div id="mise-dir-display" style="font-family:var(--font-mono);font-size:11.5px;color:var(--text-secondary);margin-bottom:12px;word-break:break-all">-</div>
+            <div class="flex gap-8">
+              <button class="btn btn-ghost btn-sm" id="btn-open-config">📂 打开目录</button>
+              <button class="btn btn-ghost btn-sm" id="btn-settings-shortcut">⚙️ 调整路径与环境变量</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 已安装工具快览 -->
+        <div class="card" id="home-tools-card">
+          <div class="card-header">
+            <div>
+              <div class="card-title">已安装工具概览</div>
+              <div class="card-subtitle" id="home-tools-subtitle">正在检测...</div>
+            </div>
+            <button class="btn btn-ghost btn-sm" id="btn-view-all">查看全部 →</button>
+          </div>
+          <div id="home-tools-grid" class="tool-grid" style="grid-template-columns: repeat(auto-fill,minmax(220px,1fr))">
+            <div class="skeleton" style="height:80px;border-radius:12px"></div>
+            <div class="skeleton" style="height:80px;border-radius:12px"></div>
+            <div class="skeleton" style="height:80px;border-radius:12px"></div>
+          </div>
+        </div>
+
+        <!-- 终端实时输出（安装或升级时显示） -->
+        <div id="home-terminal-wrap" style="margin-top:16px;display:none">
+          <div class="terminal">
+            <div class="terminal-header flex-between">
+              <div class="flex gap-6" style="align-items:center">
+                <div class="terminal-dot red"></div>
+                <div class="terminal-dot yellow"></div>
+                <div class="terminal-dot green"></div>
+                <span class="terminal-title">执行输出控制台</span>
+              </div>
+              <button class="btn btn-ghost btn-sm" id="btn-copy-home-log" style="padding:2px 8px;font-size:11px" title="复制控制台完整输出">📋 复制日志</button>
+            </div>
+            <div id="home-terminal-output"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ══════════════════ 应用市场 ══════════════════ -->
+      <section class="page" id="page-market">
+        <div class="page-header flex-between" style="align-items:flex-end">
+          <div>
+            <h1 class="page-title">应用市场</h1>
+            <p class="page-subtitle">浏览 mise 支持的所有开源工具，查看版本并一键安装 • 数据源: mise-versions.jdx.dev</p>
+          </div>
+          <div class="flex gap-8" style="align-items:center">
+            <span id="market-cache-badge" class="badge badge-neutral" style="font-size:11px;display:none">💾 缓存可用</span>
+            <button class="btn btn-ghost btn-sm" id="btn-refresh-market">🔄 强制拉取/更新</button>
+          </div>
+        </div>
+
+        <!-- 拉取进度条 -->
+        <div id="market-load-progress" style="margin-bottom:12px;display:none">
+          <div class="flex-between" style="font-size:12px;color:var(--text-secondary);margin-bottom:6px">
+            <span>正在从官方 API 批量同步工具库...</span>
+            <span id="market-progress-text">0 / 0</span>
+          </div>
+          <div class="progress-bar">
+            <div class="progress-fill" id="market-progress-fill" style="width:0%"></div>
+          </div>
+        </div>
+
+        <!-- 搜索与筛选栏 -->
+        <div class="search-wrapper mb-16">
+          <span class="search-icon">🔍</span>
+          <input type="text" class="search-input" id="market-search"
+                 placeholder="搜索开发工具（例如: node, python, go, rust, java, docker, bun...）" autocomplete="off">
+        </div>
+
+        <!-- 工具数量与快捷标签 -->
+        <div class="flex-between mb-16" style="font-size:13px;color:var(--text-secondary)">
+          <span id="market-tool-count">加载中...</span>
+          <div class="flex gap-8">
+            <button class="btn btn-secondary btn-sm" id="filter-all" data-filter="all" style="font-size:12px">全部</button>
+            <button class="btn btn-ghost btn-sm" id="filter-popular" data-filter="popular" style="font-size:12px">🔥 热门热门</button>
+          </div>
+        </div>
+
+        <!-- 工具网格 -->
+        <div class="tool-grid" id="market-tool-grid">
+          <!-- 默认骨架加载 -->
+          <div class="tool-card" style="pointer-events:none">
+            <div class="skeleton" style="height:20px;width:100px;margin-bottom:8px"></div>
+            <div class="skeleton" style="height:14px;width:100%"></div>
+          </div>
+          <div class="tool-card" style="pointer-events:none">
+            <div class="skeleton" style="height:20px;width:80px;margin-bottom:8px"></div>
+            <div class="skeleton" style="height:14px;width:100%"></div>
+          </div>
+          <div class="tool-card" style="pointer-events:none">
+            <div class="skeleton" style="height:20px;width:120px;margin-bottom:8px"></div>
+            <div class="skeleton" style="height:14px;width:100%"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ══════════════════ 已安装工具 ══════════════════ -->
+      <section class="page" id="page-installed">
+        <div class="page-header flex-between" style="align-items:flex-end">
+          <div>
+            <h1 class="page-title">已安装工具</h1>
+            <p class="page-subtitle">管理本地 mise 环境中的工具、版本切换与全局默认版本</p>
+          </div>
+          <button class="btn btn-ghost btn-sm" id="btn-refresh-installed">🔄 刷新列表</button>
+        </div>
+
+        <!-- 当前生效目录展示与切换后刷新条 -->
+        <div class="card mb-16 flex-between" style="padding:10px 14px;align-items:center;background:rgba(0,120,212,0.06);border:1px solid rgba(0,120,212,0.2)">
+          <div style="font-size:12.5px;color:var(--text-secondary);display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+            <span>📁 当前下载与生效目录 (MISE_DATA_DIR)：</span>
+            <span id="installed-active-dir" style="font-family:var(--font-mono);color:var(--accent);font-weight:600">-</span>
+          </div>
+          <button class="btn btn-primary btn-sm" id="btn-refresh-installed-active">🔄 重新扫描已下载应用</button>
+        </div>
+
+        <!-- 搜索已安装工具 -->
+        <div class="search-wrapper mb-16">
+          <span class="search-icon">🔍</span>
+          <input type="text" class="search-input" id="installed-search"
+                 placeholder="过滤已安装工具..." autocomplete="off">
+        </div>
+
+        <!-- 已安装列表容器 -->
+        <div id="installed-list-container">
+          <div class="empty-state">
+            <div class="empty-icon">⏳</div>
+            <div class="empty-title">正在读取已安装工具...</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ══════════════════ 设置 ══════════════════ -->
+      <section class="page" id="page-settings">
+        <div class="page-header">
+          <h1 class="page-title">设置</h1>
+          <p class="page-subtitle">应用配置、mise 安装路径与环境变量管理</p>
+        </div>
+
+        <!-- mise 路径配置（核心功能） -->
+        <div class="card mb-16">
+          <div class="card-header">
+            <div>
+              <div class="card-title">📁 mise 核心与数据统一目录配置</div>
+              <div class="card-subtitle">默认整合于应用根目录下的 mise 文件夹中（应用可执行文件与下载数据同目录）</div>
+            </div>
+            <span class="badge badge-info">同目录自包含</span>
+          </div>
+
+          <div style="display:grid;grid-template-columns:1fr;gap:12px;margin-bottom:16px">
+            <div>
+              <label style="font-size:12px;color:var(--text-secondary);display:block;margin-bottom:6px">
+                MISE 统一主目录（bin 与 data 均保存在此处，实现便携绿色管理）
+              </label>
+              <div style="display:grid;grid-template-columns:1fr auto;gap:8px">
+                <input type="text" class="search-input" id="input-mise-root-dir"
+                       placeholder="默认: [安装包根目录]/mise"
+                       style="font-family:var(--font-mono);font-size:12px">
+                <button class="btn btn-secondary btn-sm" id="btn-browse-root-dir">📂 浏览统一主目录</button>
+              </div>
+            </div>
+
+            <div>
+              <label style="font-size:12px;color:var(--text-secondary);display:block;margin-bottom:6px">
+                MISE_DATA_DIR — 数据目录（工具包存放目录，默认: [主目录]/data）
+              </label>
+              <div style="display:grid;grid-template-columns:1fr auto;gap:8px">
+                <input type="text" class="search-input" id="input-mise-data-dir"
+                       placeholder="默认: [主目录]/data"
+                       style="font-family:var(--font-mono);font-size:12px">
+                <button class="btn btn-secondary btn-sm" id="btn-browse-data-dir">📂 浏览</button>
+              </div>
+            </div>
+
+            <div>
+              <label style="font-size:12px;color:var(--text-secondary);display:block;margin-bottom:6px">
+                MISE_BIN_DIR — shims 目录（默认: [主目录]/data/shims）
+              </label>
+              <div style="display:grid;grid-template-columns:1fr auto;gap:8px">
+                <input type="text" class="search-input" id="input-mise-bin-dir"
+                       placeholder="默认: [主目录]/data/shims"
+                       style="font-family:var(--font-mono);font-size:12px">
+                <button class="btn btn-secondary btn-sm" id="btn-browse-bin-dir">📂 浏览</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- 生效环境变量状态 -->
+          <div style="background:rgba(0,0,0,0.25);border-radius:8px;padding:12px 14px;margin-bottom:14px;font-family:var(--font-mono);font-size:11.5px;line-height:1.9">
+            <div><span style="color:var(--text-tertiary)">应用运行根目录  = </span><span id="preview-app-base" style="color:var(--text-secondary)">-</span></div>
+            <div><span style="color:var(--text-tertiary)">MISE 统一主目录 = </span><span id="preview-root-dir" style="color:var(--accent)">-</span></div>
+            <div><span style="color:var(--text-tertiary)">MISE_DATA_DIR   = </span><span id="preview-data-dir" style="color:#4fc3f7">-</span></div>
+            <div><span style="color:var(--text-tertiary)">MISE_BIN_DIR    = </span><span id="preview-bin-dir" style="color:#ce93d8">-</span></div>
+            <div><span style="color:var(--text-tertiary)">mise 实际入口    = </span><span id="preview-bin-path" style="color:#81c784">-</span></div>
+          </div>
+
+          <div class="flex gap-8" style="flex-wrap:wrap">
+            <button class="btn btn-primary btn-sm" id="btn-save-mise-paths">💾 保存路径配置</button>
+            <button class="btn btn-secondary btn-sm" id="btn-refresh-apps-after-path">🔄 刷新已下载应用</button>
+            <button class="btn btn-ghost btn-sm" id="btn-reset-mise-paths">🔄 恢复默认同目录</button>
+            <button class="btn btn-ghost btn-sm" id="btn-open-mise-data-dir">📂 打开当前数据目录</button>
+            <button class="btn btn-danger btn-sm" id="btn-uninstall-mise-settings">🗑️ 卸载 mise 核心与数据</button>
+          </div>
+        </div>
+
+        <!-- ══════════════════ Windows 环境变量查看与配置 ══════════════════ -->
+        <div class="card mb-16">
+          <div class="card-header">
+            <div>
+              <div class="card-title">🌐 Windows 用户环境变量查看与配置</div>
+              <div class="card-subtitle">查看当前系统的 Path 及独立环境变量，支持一键将 3 个对应地址配置到系统</div>
+            </div>
+            <button class="btn btn-ghost btn-sm" id="btn-refresh-env">🔄 刷新环境变量检测</button>
+          </div>
+
+          <div style="margin-bottom:16px;background:rgba(0,0,0,0.2);border-radius:8px;padding:12px;border:1px solid rgba(255,255,255,0.06)">
+            <!-- 表头 -->
+            <div style="display:grid;grid-template-columns:180px 1fr 140px 140px;gap:8px;padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,0.08);font-size:11.5px;color:var(--text-tertiary);font-weight:600">
+              <div>配置项 / 作用</div>
+              <div>目标物理路径 (统一目录)</div>
+              <div>独立变量状态</div>
+              <div>用户 Path 状态</div>
+            </div>
+
+            <!-- 条目 1: mise 实际入口目录 -->
+            <div style="display:grid;grid-template-columns:180px 1fr 140px 140px;gap:8px;align-items:center;padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.04);font-size:12px">
+              <div>
+                <b style="color:var(--text-primary)">1. mise 入口所在目录</b>
+                <div style="font-size:10.5px;color:var(--text-tertiary)">包含 mise.exe 核心程序</div>
+              </div>
+              <div id="env-val-exe-dir" style="font-family:var(--font-mono);font-size:11.5px;color:#81c784;word-break:break-all">-</div>
+              <div><span class="badge badge-neutral" style="font-size:10.5px">- (通过 Path 调用)</span></div>
+              <div id="env-status-path-exe"><span class="badge badge-neutral">检测中...</span></div>
+            </div>
+
+            <!-- 条目 2: MISE_BIN_DIR (shims 目录) -->
+            <div style="display:grid;grid-template-columns:180px 1fr 140px 140px;gap:8px;align-items:center;padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.04);font-size:12px">
+              <div>
+                <b style="color:var(--text-primary)">2. MISE_BIN_DIR</b>
+                <div style="font-size:10.5px;color:var(--text-tertiary)">shims 垫片执行目录</div>
+              </div>
+              <div id="env-val-bin-dir" style="font-family:var(--font-mono);font-size:11.5px;color:#ce93d8;word-break:break-all">-</div>
+              <div id="env-status-var-bin"><span class="badge badge-neutral">检测中...</span></div>
+              <div id="env-status-path-bin"><span class="badge badge-neutral">检测中...</span></div>
+            </div>
+
+            <!-- 条目 3: MISE_DATA_DIR (数据目录) -->
+            <div style="display:grid;grid-template-columns:180px 1fr 140px 140px;gap:8px;align-items:center;padding:10px 0;font-size:12px">
+              <div>
+                <b style="color:var(--text-primary)">3. MISE_DATA_DIR</b>
+                <div style="font-size:10.5px;color:var(--text-tertiary)">工具安装与下载主数据</div>
+              </div>
+              <div id="env-val-data-dir" style="font-family:var(--font-mono);font-size:11.5px;color:#4fc3f7;word-break:break-all">-</div>
+              <div id="env-status-var-data"><span class="badge badge-neutral">检测中...</span></div>
+              <div id="env-status-path-data"><span class="badge badge-neutral">检测中...</span></div>
+            </div>
+          </div>
+
+          <div class="flex gap-8" style="align-items:center">
+            <button class="btn btn-primary btn-sm" id="btn-apply-env">⚡ 一键同步写入 Windows 环境变量</button>
+            <button class="btn btn-ghost btn-sm" id="btn-remove-env" style="color:var(--danger)">🗑️ 从环境变量中一键清除</button>
+            <span style="font-size:11.5px;color:var(--text-tertiary);margin-left:auto">
+              💡 写入后将立即生效于新建的 CMD / PowerShell 终端窗口
+            </span>
+          </div>
+        </div>
+
+        <div class="grid-2">
+          <!-- 市场缓存卡片 -->
+          <div class="card">
+            <div class="card-title" style="margin-bottom:8px">💾 市场工具缓存</div>
+            <div id="cache-info-display" style="font-size:13px;color:var(--text-secondary);line-height:1.8;margin-bottom:12px">
+              检测中...
+            </div>
+            <div class="flex gap-8">
+              <button class="btn btn-secondary btn-sm" id="btn-refresh-cache">🔄 强制全量更新</button>
+              <button class="btn btn-danger btn-sm" id="btn-clear-cache">🗑️ 清除本地缓存</button>
+            </div>
+          </div>
+
+          <!-- mise 工具包缓存清理 -->
+          <div class="card">
+            <div class="card-title" style="margin-bottom:8px">🧹 清理 mise 下载缓存</div>
+            <p style="font-size:12.5px;color:var(--text-secondary);margin-bottom:12px">
+              执行 <code>mise cache clear</code> 清理临时下载的压缩包，释放磁盘空间。
+            </p>
+            <button class="btn btn-danger btn-sm" id="btn-clean-cache">清理下载缓存</button>
+          </div>
+
+          <!-- 外观与主题卡片 -->
+          <div class="card">
+            <div class="card-title" style="margin-bottom:8px">🎨 外观主题</div>
+            <p style="font-size:12.5px;color:var(--text-secondary);margin-bottom:12px">
+              选择适合您的 Windows 11 Fluent 视觉风格，支持浅色模式与深邃暗色：
+            </p>
+            <div class="flex gap-8 mb-12">
+              <button class="btn btn-secondary btn-sm" id="btn-theme-dark">🌙 深色模式</button>
+              <button class="btn btn-secondary btn-sm" id="btn-theme-light">☀️ 浅色模式</button>
+              <button class="btn btn-ghost btn-sm" id="btn-theme-auto">💻 跟随系统</button>
+            </div>
+            <div style="font-size:12px;color:var(--text-tertiary)">
+              当前主题：<span id="current-theme-label" style="color:var(--accent);font-weight:600">深色模式</span>
+            </div>
+          </div>
+
+          <!-- 网络代理 -->
+          <div class="card">
+            <div class="card-title" style="margin-bottom:8px">🌐 网络与代理</div>
+            <p style="font-size:12.5px;color:var(--text-secondary);margin-bottom:12px">
+              如遇 GitHub 下载过慢或网络超时，可在此设置 HTTP/SOCKS 代理：
+            </p>
+            <input type="text" class="search-input" id="input-proxy" placeholder="如: http://127.0.0.1:7890" style="margin-bottom:10px">
+            <button class="btn btn-secondary btn-sm" id="btn-save-proxy">保存代理设置</button>
+          </div>
+
+          <!-- 关于 -->
+          <div class="card">
+            <div class="card-title" style="margin-bottom:8px">ℹ️ 关于 Mise Manager</div>
+            <div style="font-size:13px;color:var(--text-secondary);line-height:1.8">
+              <div>Mise Manager <span style="color:var(--accent);font-weight:600">v1.0.0</span></div>
+              <div>设计规范：Windows 11 Fluent Design (Mica 材质)</div>
+              <div>官方仓库：github.com/jdx/mise</div>
+              <div>市场数据：github.com/jdx/mise-versions</div>
+            </div>
+            <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap">
+              <button class="btn btn-ghost btn-sm" id="btn-mise-docs">📄 mise 官网文档</button>
+              <button class="btn btn-ghost btn-sm" id="btn-mise-github">⭐ mise GitHub</button>
+              <button class="btn btn-ghost btn-sm" id="btn-mise-versions-site">🌐 版本市场在线版</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- ── 状态栏 ── -->
+  <div id="status-bar">
+    <div class="status-item">
+      <div class="status-dot" id="status-mise-dot"></div>
+      <span id="status-mise-text">检测中...</span>
+    </div>
+    <div class="status-item">
+      <div class="status-dot" id="status-net-dot"></div>
+      <span id="status-net-text">就绪</span>
+    </div>
+    <span style="margin-left:auto" id="status-time"></span>
+  </div>
+
+</div>
+
+<!-- Toast 容器 -->
+<div id="toast-container"></div>
+
+<!-- 工具版本详情模态框 -->
+<div id="tool-modal" class="modal-overlay" style="display:none">
+  <div class="modal">
+    <div class="modal-header">
+      <div>
+        <div class="modal-title" id="modal-tool-name">工具名称</div>
+        <div style="font-size:13px;color:var(--text-secondary);margin-top:4px" id="modal-tool-desc"></div>
+      </div>
+      <button class="btn btn-ghost btn-icon" id="modal-close">✕</button>
+    </div>
+    <div class="modal-body">
+      <!-- 工具信息 -->
+      <div class="flex gap-12 mb-16" style="flex-wrap:wrap">
+        <div class="badge badge-info" id="modal-latest-badge">最新: -</div>
+        <div class="badge badge-success" id="modal-stable-badge">稳定: -</div>
+        <div class="badge badge-neutral" id="modal-count-badge">版本数: -</div>
+      </div>
+
+      <!-- 链接区 -->
+      <div class="flex gap-8 mb-16" id="modal-links" style="flex-wrap:wrap"></div>
+
+      <!-- 终端输出 -->
+      <div id="modal-terminal-wrap" style="display:none;margin-bottom:16px">
+        <div class="terminal" style="max-height:180px">
+          <div class="terminal-header flex-between">
+            <div class="flex gap-6" style="align-items:center">
+              <div class="terminal-dot red"></div>
+              <div class="terminal-dot yellow"></div>
+              <div class="terminal-dot green"></div>
+              <span class="terminal-title">执行输出控制台</span>
+            </div>
+            <button class="btn btn-ghost btn-sm" id="btn-copy-modal-log" style="padding:2px 8px;font-size:11px" title="复制控制台输出">📋 复制日志</button>
+          </div>
+          <div id="modal-terminal-output"></div>
+        </div>
+      </div>
+
+      <!-- 版本列表 -->
+      <div class="card-title mb-8">可用版本列表</div>
+      <div class="progress-bar mb-8" id="modal-progress-bar" style="display:none">
+        <div class="progress-fill indeterminate"></div>
+      </div>
+      <div class="version-list" id="modal-version-list">
+        <div class="empty-state" style="padding:30px">
+          <div class="empty-icon">⏳</div>
+          <div class="empty-title">正在获取远程可用版本...</div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" id="modal-cancel">关闭</button>
+      <a href="#" class="btn btn-secondary btn-sm" id="modal-github-link" target="_blank" style="display:none">
+        🔗 打开 GitHub 仓库
+      </a>
+    </div>
+  </div>
+</div>
+
+<script src="js/app.js"></script>
+</body>
+</html>

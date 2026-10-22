@@ -1,0 +1,27 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Build artifacts & Dist
+dist/
+build/*.tmp
+
+# Runtime data & Mise unified local installations
+mise/data/
+mise/bin/
+*.log
+startup.log
+market_cache.json
+config.json
+
+# OS & IDE
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?

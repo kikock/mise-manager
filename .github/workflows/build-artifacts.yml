@@ -1,0 +1,145 @@
+name: Build And Release Desktop
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*.*.*'
+      - '*.*.*'
+
+permissions:
+  contents: write
+
+jobs:
+  prepare-version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag_name: ${{ steps.version.outputs.tag_name }}
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Read version from package.json
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="$(node -p "require('./package.json').version")"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+          
+          # 处理带 v 前缀的 tag
+          tag="${GITHUB_REF_NAME:-v$version}"
+          echo "tag_name=${tag}" >> "$GITHUB_OUTPUT"
+          echo "检测到版本号: $version (Tag: $tag)"
+
+      - name: Validate tag matches package version
+        if: github.event_name == 'push' && github.ref_type == 'tag'
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected_version="${{ steps.version.outputs.version }}"
+          pushed_tag="${{ github.ref_name }}"
+          # 允许 v1.0.0 或 1.0.0
+          clean_tag="${pushed_tag#v}"
+
+          if [[ "$clean_tag" != "$expected_version" ]]; then
+            echo "❌ 推送的 tag ($pushed_tag) 与 package.json 版本 ($expected_version) 不一致"
+            exit 1
+          fi
+          echo "✅ Tag 与 package.json 版本匹配一致: $pushed_tag"
+
+  create-release:
+    needs: prepare-version
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Create or Update GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ needs.prepare-version.outputs.tag_name }}
+          APP_VERSION: ${{ needs.prepare-version.outputs.version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          title="mise-manager v${APP_VERSION}"
+          notes="### 🚀 mise-manager v${APP_VERSION} 发布日志\n\n- Windows 11 Fluent Design 版本管理器\n- 支持统一绿色目录架构与独立数据配置\n- 环境变量一键同步写入与清除\n- 支持深色 / 浅色模式切换\n- 包含官方 mise-versions 应用市场极速同步"
+
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            echo "Release $RELEASE_TAG 已存在，执行更新..."
+            gh release edit "$RELEASE_TAG" \
+              --title "$title" \
+              --notes "$notes" \
+              --draft=false \
+              --prerelease=false
+          else
+            echo "创建新的 Release $RELEASE_TAG ..."
+            gh release create "$RELEASE_TAG" \
+              --title "$title" \
+              --notes "$notes" \
+              --target "$GITHUB_SHA"
+          fi
+
+  release-windows:
+    needs:
+      - prepare-version
+      - create-release
+    runs-on: windows-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: yarn
+
+      - name: Install Dependencies
+        run: yarn install --immutable
+
+      - name: Build Application (Windows NSIS)
+        run: yarn build
+
+      - name: Validate Windows Artifacts
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $patterns = @(
+            'dist/latest.yml',
+            'dist/mise-manager-setup-*.exe',
+            'dist/mise-manager-setup-*.exe.blockmap'
+          )
+
+          foreach ($pattern in $patterns) {
+            $items = Get-ChildItem -Path $pattern -ErrorAction SilentlyContinue
+            if (-not $items) {
+              throw "❌ 构建校验失败，未找到目标文件: $pattern"
+            }
+            Write-Host "✅ 验证通过: $($items.FullName)"
+          }
+
+      - name: Upload Windows Assets to Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ needs.prepare-version.outputs.tag_name }}
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $files = @(
+            Get-ChildItem 'dist/latest.yml' | Select-Object -ExpandProperty FullName
+            Get-ChildItem 'dist/mise-manager-setup-*.exe' | Select-Object -ExpandProperty FullName
+            Get-ChildItem 'dist/mise-manager-setup-*.exe.blockmap' | Select-Object -ExpandProperty FullName
+          )
+
+          Write-Host "正在上传 Windows 构建产物到 Release: $env:RELEASE_TAG"
+          gh release upload $env:RELEASE_TAG @files --clobber
+          Write-Host "🎉 上传成功完成！"
