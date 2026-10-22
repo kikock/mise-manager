@@ -14,7 +14,7 @@ contextBridge.exposeInMainWorld('miseAPI', {
     check:         () => ipcRenderer.invoke('mise:check'),
     where:         (toolVersion) => ipcRenderer.invoke('mise:where', toolVersion),
     listInstalled: () => ipcRenderer.invoke('mise:listInstalled'),
-    use:           (tool, version, isGlobal) => ipcRenderer.invoke('mise:use', { tool, version, isGlobal }),
+    use:           (tool, version, isGlobal, cwd) => ipcRenderer.invoke('mise:use', { tool, version, isGlobal, cwd }),
     exec:          (args) => ipcRenderer.invoke('mise:exec', args),
     install:       (options) => ipcRenderer.invoke('mise:install', options),
     uninstall:     () => ipcRenderer.invoke('mise:uninstall'),
@@ -69,5 +69,7 @@ contextBridge.exposeInMainWorld('miseAPI', {
   app: {
     getVersion:  () => ipcRenderer.invoke('app:getVersion'),
     checkUpdate: () => ipcRenderer.invoke('app:checkUpdate'),
+    getReleases: () => ipcRenderer.invoke('app:getReleases'),
   },
 });
+

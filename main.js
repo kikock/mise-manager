@@ -461,17 +461,21 @@ ipcMain.handle('mise:listInstalled', async () => {
 // ─────────────────────────────────────────────
 // IPC 处理器：版本切换与激活 (mise use)
 // ─────────────────────────────────────────────
-ipcMain.handle('mise:use', async (event, { tool, version, isGlobal = true }) => {
+ipcMain.handle('mise:use', async (event, { tool, version, isGlobal = true, cwd = null }) => {
   return new Promise((resolve) => {
     const miseExe = getMiseBinPath();
     const env = buildMiseEnv();
     const flag = isGlobal ? '-g' : '';
     const cmd = `"${miseExe}" use ${flag} ${tool}@${version}`;
+    const execOpts = { shell: true, env };
+    if (cwd && fs.existsSync(cwd)) {
+      execOpts.cwd = cwd;
+    }
 
-    exec(cmd, { shell: true, env }, (err, stdout, stderr) => {
+    exec(cmd, execOpts, (err, stdout, stderr) => {
       const out = stdout || stderr || '';
       if (mainWindow) {
-        mainWindow.webContents.send('mise:stream', `[mise use] ${cmd}\r\n${out}\r\n`);
+        mainWindow.webContents.send('mise:stream', `[mise use${cwd ? ` @ ${cwd}` : ''}] ${cmd}\r\n${out}\r\n`);
       }
       if (err) {
         resolve({ success: false, output: out, error: err.message });
@@ -838,14 +842,79 @@ ipcMain.handle('market:fetchVersions', async (event, toolName) => {
 // ─────────────────────────────────────────────
 // IPC 处理器：打开外部链接与物理目录
 // ─────────────────────────────────────────────
-ipcMain.handle('shell:openExternal', (event, url) => {
-  shell.openExternal(url);
+ipcMain.handle('shell:openExternal', async (event, url) => {
+  if (!url || typeof url !== 'string') return false;
+  const target = url.trim();
+  // 安全校验协议
+  if (!/^https?:\/\//i.test(target) && !target.startsWith('file://')) {
+    return false;
+  }
+
+  // Windows 平台下如果使用 shell.openExternal，部分系统会因 COM/DDE 协商或安全软件拦截发生数秒延迟
+  // 使用 cmd.exe /c start "" 异步分离子进程能实现毫秒级快速唤起外部浏览器
+  if (process.platform === 'win32' && /^https?:\/\//i.test(target)) {
+    try {
+      const { spawn } = require('child_process');
+      const child = spawn('cmd.exe', ['/c', 'start', '', target], {
+        detached: true,
+        stdio: 'ignore',
+        windowsHide: true,
+      });
+      child.unref();
+      return true;
+    } catch (err) {
+      console.warn('Windows 原生 start 唤起异常，回退至 shell.openExternal:', err);
+    }
+  }
+
+  try {
+    await shell.openExternal(target);
+    return true;
+  } catch (err) {
+    console.error('shell.openExternal 失败:', err);
+    return false;
+  }
 });
 
 ipcMain.handle('shell:openPath', async (event, fullPath) => {
-  if (fullPath && fs.existsSync(fullPath)) {
-    await shell.openPath(fullPath);
-    return true;
+  if (!fullPath || typeof fullPath !== 'string') return false;
+  let targetPath = path.normalize(fullPath.trim());
+
+  let exists = fs.existsSync(targetPath);
+  if (!exists) {
+    const parent = path.dirname(targetPath);
+    if (fs.existsSync(parent)) {
+      targetPath = parent;
+      exists = true;
+    }
+  }
+
+  if (!exists) {
+    console.warn('shell:openPath 物理路径不存在:', targetPath);
+    return false;
+  }
+
+  try {
+    const err = await shell.openPath(targetPath);
+    if (!err) return true;
+    console.warn('shell.openPath 返回错误，尝试 explorer 回退:', err);
+  } catch (e) {
+    console.warn('shell.openPath 异常:', e);
+  }
+
+  // Windows 原生 explorer 回退，保障 100% 成功弹出资源管理器窗口
+  if (process.platform === 'win32') {
+    try {
+      const { spawn } = require('child_process');
+      const child = spawn('explorer.exe', [targetPath], {
+        detached: true,
+        stdio: 'ignore',
+      });
+      child.unref();
+      return true;
+    } catch (e) {
+      console.error('explorer 回退调用失败:', e);
+    }
   }
   return false;
 });
@@ -938,3 +1007,66 @@ function isNewerVersion(latest, current) {
   if (l1 === c1 && l2 === c2 && l3 > c3) return true;
   return false;
 }
+
+// 缓存历史版本数据（10分钟）
+let releasesCache = { data: null, timestamp: 0 };
+
+ipcMain.handle('app:getReleases', async () => {
+  const currentVersion = getAppVersion();
+  const repo = 'kikock/mise-manager';
+  const now = Date.now();
+
+  // 若存在有效缓存则秒级返回
+  if (releasesCache.data && (now - releasesCache.timestamp < 10 * 60 * 1000)) {
+    return { ...releasesCache.data, fromCache: true, currentVersion };
+  }
+
+  const { net } = require('electron');
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 6000);
+
+    const resp = await net.fetch(`https://api.github.com/repos/${repo}/releases?per_page=15`, {
+      headers: { 'User-Agent': 'Mise-Manager-Desktop' },
+      signal: controller.signal
+    });
+    clearTimeout(timer);
+
+    if (!resp.ok) throw new Error(`GitHub 响应异常: ${resp.status}`);
+
+    const rawList = await resp.json();
+    const releases = (Array.isArray(rawList) ? rawList : []).map(r => ({
+      id: r.id,
+      name: r.name || r.tag_name,
+      tag: (r.tag_name || '').replace(/^v/i, '').trim(),
+      tagName: r.tag_name,
+      publishedAt: r.published_at,
+      body: r.body || '',
+      htmlUrl: r.html_url,
+      isPrerelease: !!r.prerelease,
+      assets: (r.assets || []).map(a => ({
+        name: a.name,
+        size: a.size,
+        downloadCount: a.download_count,
+        downloadUrl: a.browser_download_url
+      }))
+    }));
+
+    const result = {
+      success: true,
+      currentVersion,
+      releases,
+      releasesUrl: `https://github.com/${repo}/releases`
+    };
+    releasesCache = { data: result, timestamp: now };
+    return result;
+  } catch (err) {
+    return {
+      success: false,
+      currentVersion,
+      error: err.name === 'AbortError' ? '请求超时，网络连接较慢' : (err.message || '网络连接异常'),
+      cachedReleases: releasesCache.data?.releases || [],
+      releasesUrl: `https://github.com/${repo}/releases`
+    };
+  }
+});

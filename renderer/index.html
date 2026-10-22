@@ -243,6 +243,33 @@
           <button class="btn btn-primary btn-sm" id="btn-refresh-installed-active">🔄 重新扫描已下载应用</button>
         </div>
 
+        <!-- 版本作用域说明小贴士 -->
+        <div class="card mb-16" style="padding:12px 16px;background:var(--bg-tertiary);border:1px solid var(--border);border-radius:var(--radius-md)">
+          <div class="flex-between" style="align-items:center;margin-bottom:8px">
+            <div class="flex gap-8" style="align-items:center">
+              <span style="font-size:16px">💡</span>
+              <span style="font-weight:600;font-size:13px;color:var(--text-primary)">版本控制指南：全局使用 vs 本地使用有何区别？</span>
+            </div>
+            <span class="badge badge-info" style="font-size:10.5px">mise 核心机制</span>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(280px, 1fr));gap:12px;font-size:12px;color:var(--text-secondary);line-height:1.6">
+            <div style="background:var(--bg-card);padding:10px 14px;border-radius:var(--radius-sm);border-left:3px solid var(--accent)">
+              <div style="font-weight:600;color:var(--text-primary);margin-bottom:4px;display:flex;align-items:center;gap:6px">
+                <span>🌟 设为全局使用 (Global)</span>
+                <span class="badge badge-neutral" style="font-size:10px">~/.config/mise/config.toml</span>
+              </div>
+              <div>系统级默认版本。在 Windows 任意新建终端或常规目录下，输入命令时默认均直接调用此版本，适合日常主力环境。</div>
+            </div>
+            <div style="background:var(--bg-card);padding:10px 14px;border-radius:var(--radius-sm);border-left:3px solid #ff9800">
+              <div style="font-weight:600;color:var(--text-primary);margin-bottom:4px;display:flex;align-items:center;gap:6px">
+                <span>📍 本地项目使用 (Local)</span>
+                <span class="badge badge-neutral" style="font-size:10px">.mise.toml</span>
+              </div>
+              <div>项目级锁定版本。点击后可选择目标项目文件夹并生成配置，仅在该项目及其子目录下生效，离开后自动恢复全局默认，实现多项目版本隔离。</div>
+            </div>
+          </div>
+        </div>
+
         <!-- 搜索已安装工具 -->
         <div class="search-wrapper mb-16">
           <span class="search-icon">🔍</span>
@@ -467,9 +494,10 @@
                     <span style="font-size:17px;font-weight:700;letter-spacing:-0.01em">Mise Manager</span>
                     <span class="badge badge-neutral" id="app-current-version-badge" style="font-family:var(--font-mono);font-size:11.5px;padding:3px 8px">v1.0.0</span>
                     <span id="update-status-pill" class="badge badge-success" style="font-size:11px">已是最新版</span>
+                    <a href="#" id="link-author-badge" class="badge badge-info" style="font-size:11px;padding:2px 8px;text-decoration:none;cursor:pointer" title="访问开发者 kikock 的 GitHub 主页">👨‍💻 kikock</a>
                   </div>
                   <div style="font-size:12.5px;color:var(--text-secondary);margin-top:4px;line-height:1.5">
-                    专为 Windows 打造的开发环境与工具多版本管理桌面应用 · Fluent Design 视觉体系
+                    专为 Windows 打造的开发环境与工具多版本管理桌面应用 · 开发者: <strong style="color:var(--text-primary)">kikock</strong> · Fluent Design
                   </div>
                 </div>
               </div>
@@ -507,10 +535,34 @@
                 <span>宿主环境：Electron <span id="app-electron-ver" style="color:var(--text-secondary)">32.x</span> / Node.js <span id="app-node-ver" style="color:var(--text-secondary)">22.x</span></span>
                 <span>平台内核：<span id="app-mise-core-ver" style="color:var(--accent);font-weight:600">检测中...</span></span>
               </div>
-              <div class="flex gap-12" style="font-size:12px">
+              <div class="flex gap-12" style="font-size:12px;flex-wrap:wrap">
                 <a href="#" id="btn-mise-docs" style="color:var(--accent);text-decoration:none">📄 官方文档</a>
-                <a href="#" id="btn-mise-github" style="color:var(--accent);text-decoration:none">⭐ mise 源码</a>
                 <a href="#" id="btn-mise-versions-site" style="color:var(--accent);text-decoration:none">🌐 生态索引市场</a>
+                <a href="#" id="btn-project-repo" style="color:var(--accent);text-decoration:none">⭐ 本项目源码仓库</a>
+              </div>
+            </div>
+
+            <!-- 开发者与开源致敬区 -->
+            <div style="margin-top:12px;padding:12px 16px;border-radius:var(--radius-sm);background:rgba(255,255,255,0.02);border:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;font-size:12px">
+              <div class="flex gap-12" style="align-items:center;flex-wrap:wrap">
+                <span style="color:var(--text-secondary)">
+                  👨‍💻 开发者：<a href="#" id="btn-author-kikock" style="color:var(--text-primary);font-weight:600;text-decoration:none;cursor:pointer" title="访问 kikock GitHub 主页">kikock</a>
+                </span>
+                <span style="color:var(--border)">|</span>
+                <span style="color:var(--text-secondary)">
+                  🙏 特别致敬：<strong style="color:var(--text-primary)">jdx</strong>（打造了卓越的 <code style="color:var(--accent);font-size:11px">mise</code> 内核与 <code style="color:var(--accent);font-size:11px">mise-versions</code> 生态）
+                </span>
+              </div>
+              <div class="flex gap-8" style="font-size:11px;flex-wrap:wrap">
+                <a href="#" id="btn-github-kikock" class="btn btn-ghost btn-sm" style="font-size:11px;padding:3px 9px;text-decoration:none;border:1px solid var(--border)" title="关注开发者 kikock">
+                  🐙 GitHub @kikock
+                </a>
+                <a href="#" id="btn-mise-github" class="btn btn-ghost btn-sm" style="font-size:11px;padding:3px 9px;text-decoration:none;border:1px solid var(--border)" title="访问 jdx/mise 核心源码">
+                  ⭐ jdx/mise
+                </a>
+                <a href="#" id="btn-mise-versions-github" class="btn btn-ghost btn-sm" style="font-size:11px;padding:3px 9px;text-decoration:none;border:1px solid var(--border)" title="访问 jdx/mise-versions 生态索引源码">
+                  📦 jdx/mise-versions
+                </a>
               </div>
             </div>
           </div>
@@ -596,6 +648,44 @@
   </div>
 </div>
 
+<!-- 模态框: 历史发行版本列表 -->
+<div id="releases-modal" class="modal-overlay" style="display:none">
+  <div class="modal" style="width:680px;max-width:92vw;max-height:85vh">
+    <div class="modal-header">
+      <div class="flex gap-12" style="align-items:center">
+        <span style="font-size:24px">📦</span>
+        <div>
+          <div class="modal-title">Mise Manager 历史发行版本</div>
+          <div style="font-size:12px;color:var(--text-secondary);margin-top:2px;display:flex;align-items:center;gap:6px">
+            <span>当前运行:</span>
+            <span id="releases-current-badge" class="badge badge-success" style="padding:1px 7px;font-size:11px">v1.0.0</span>
+            <span id="releases-cache-tag" class="badge badge-neutral" style="padding:1px 7px;font-size:10px;display:none">缓存数据</span>
+          </div>
+        </div>
+      </div>
+      <div class="flex gap-8" style="align-items:center">
+        <button class="btn btn-secondary btn-sm" id="btn-releases-open-browser" title="在系统浏览器中访问 GitHub Releases 页面">
+          🌐 浏览器打开
+        </button>
+        <button class="btn btn-ghost btn-icon" id="releases-modal-close" title="关闭 (Esc)">✕</button>
+      </div>
+    </div>
+    <div class="modal-body" id="releases-modal-body" style="padding-right:6px">
+      <div class="empty-state" style="padding:40px 0">
+        <div class="empty-icon">⏳</div>
+        <div class="empty-title">正在获取发行版本记录...</div>
+      </div>
+    </div>
+    <div class="modal-footer flex-between" style="align-items:center">
+      <span style="font-size:11.5px;color:var(--text-tertiary)" id="releases-status-tip">
+        ⚡ 应用内极速呈现 · 如需安装包可直接点击下载或复制链接
+      </span>
+      <button class="btn btn-secondary btn-sm" id="releases-modal-cancel">关闭</button>
+    </div>
+  </div>
+</div>
+
 <script src="js/app.js"></script>
 </body>
 </html>
+

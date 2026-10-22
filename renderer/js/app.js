@@ -88,6 +88,32 @@ function showToast(message, type = 'info', duration = 3500) {
   }, duration);
 }
 
+/** 带有即时视觉反馈与防抖的外部链接打开函数，消除Windows唤起浏览器的感知卡顿 */
+async function openExternalWithFeedback(url, btn = null, desc = '网页') {
+  if (!url) return;
+  let originalHtml = '';
+  if (btn && !btn.disabled) {
+    btn.disabled = true;
+    originalHtml = btn.innerHTML;
+    btn.innerHTML = `<span style="display:inline-block;animation:spin 0.8s linear infinite;margin-right:4px">🔄</span> 正在调起...`;
+  }
+  showToast(`正在呼起系统浏览器访问 ${desc}...`, 'info', 2200);
+
+  try {
+    await window.miseAPI.shell.openExternal(url);
+  } catch (err) {
+    showToast('打开失败: ' + (err.message || '系统调用异常'), 'error');
+  } finally {
+    if (btn) {
+      setTimeout(() => {
+        btn.disabled = false;
+        btn.innerHTML = originalHtml;
+      }, 1200);
+    }
+  }
+}
+window.openExternalWithFeedback = openExternalWithFeedback;
+
 /** 追加终端输出内容 */
 function appendTerminal(el, text, cls = '') {
   if (!el) return;
@@ -166,6 +192,132 @@ function getToolEmoji(name) {
     if (lower.includes(key)) return emoji;
   }
   return '🛠️';
+}
+
+/** 
+ * 高性能安全 Markdown 解析器，支持标题、列表、加粗、代码块、链接与分割线 
+ */
+function renderMarkdown(md) {
+  if (!md || typeof md !== 'string') return '';
+
+  // 1. 保护代码块
+  const codeBlocks = [];
+  let text = md.replace(/```([a-zA-Z0-9_-]*)\r?\n([\s\S]*?)```/g, (match, lang, code) => {
+    const id = `__CODE_BLOCK_${codeBlocks.length}__`;
+    codeBlocks.push(`<pre><code class="language-${lang || 'text'}">${escapeHtml(code.trim())}</code></pre>`);
+    return id;
+  });
+
+  // 2. 保护行内代码
+  const inlineCodes = [];
+  text = text.replace(/`([^`\n]+)`/g, (match, code) => {
+    const id = `__INLINE_CODE_${inlineCodes.length}__`;
+    inlineCodes.push(`<code>${escapeHtml(code)}</code>`);
+    return id;
+  });
+
+  // 3. 逐行解析块级元素
+  const lines = text.split(/\r?\n/);
+  const out = [];
+  let inUl = false;
+  let inOl = false;
+
+  for (let i = 0; i < lines.length; i++) {
+    let line = lines[i];
+
+    // 水平分割线 (--- / ***)
+    if (/^\s*(?:---|___|\*\*\*)\s*$/.test(line)) {
+      if (inUl) { out.push('</ul>'); inUl = false; }
+      if (inOl) { out.push('</ol>'); inOl = false; }
+      out.push('<hr />');
+      continue;
+    }
+
+    // 标题 (# ~ ####)
+    const hMatch = line.match(/^(#{1,4})\s+(.+)$/);
+    if (hMatch) {
+      if (inUl) { out.push('</ul>'); inUl = false; }
+      if (inOl) { out.push('</ol>'); inOl = false; }
+      const level = hMatch[1].length;
+      out.push(`<h${level}>${formatInlineMd(hMatch[2])}</h${level}>`);
+      continue;
+    }
+
+    // 引用块 (> text)
+    const bMatch = line.match(/^>\s*(.+)$/);
+    if (bMatch) {
+      if (inUl) { out.push('</ul>'); inUl = false; }
+      if (inOl) { out.push('</ol>'); inOl = false; }
+      out.push(`<blockquote>${formatInlineMd(bMatch[1])}</blockquote>`);
+      continue;
+    }
+
+    // 无序列表 (- / * / +)
+    const ulMatch = line.match(/^\s*[-*+]\s+(.+)$/);
+    if (ulMatch) {
+      if (inOl) { out.push('</ol>'); inOl = false; }
+      if (!inUl) { out.push('<ul>'); inUl = true; }
+      out.push(`<li>${formatInlineMd(ulMatch[1])}</li>`);
+      continue;
+    }
+
+    // 有序列表 (1. text)
+    const olMatch = line.match(/^\s*\d+\.\s+(.+)$/);
+    if (olMatch) {
+      if (inUl) { out.push('</ul>'); inUl = false; }
+      if (!inOl) { out.push('<ol>'); inOl = true; }
+      out.push(`<li>${formatInlineMd(olMatch[1])}</li>`);
+      continue;
+    }
+
+    // 普通文本行或空行
+    if (inUl) { out.push('</ul>'); inUl = false; }
+    if (inOl) { out.push('</ol>'); inOl = false; }
+
+    const trimmed = line.trim();
+    if (trimmed === '') {
+      out.push('<div style="height:4px"></div>');
+    } else {
+      out.push(`<p>${formatInlineMd(line)}</p>`);
+    }
+  }
+
+  if (inUl) out.push('</ul>');
+  if (inOl) out.push('</ol>');
+
+  let result = out.join('\n');
+
+  // 恢复行内代码
+  inlineCodes.forEach((code, idx) => {
+    result = result.replace(`__INLINE_CODE_${idx}__`, code);
+  });
+
+  // 恢复多行代码块
+  codeBlocks.forEach((code, idx) => {
+    result = result.replace(`__CODE_BLOCK_${idx}__`, code);
+  });
+
+  return result;
+}
+
+function formatInlineMd(str) {
+  if (!str) return '';
+  let s = escapeHtml(str);
+
+  // 加粗 **bold** 与 __bold__
+  s = s.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  s = s.replace(/__(.+?)__/g, '<strong>$1</strong>');
+
+  // 斜体 *italic* 与 _italic_
+  s = s.replace(/\*([^*]+?)\*/g, '<em>$1</em>');
+  s = s.replace(/_([^_]+?)_/g, '<em>$1</em>');
+
+  // 链接 [text](url)
+  s = s.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, (match, txt, url) => {
+    return `<a href="#" onclick="openExternalWithFeedback('${escapeAttr(url)}', this, '${escapeAttr(txt)}'); return false;">${txt}</a>`;
+  });
+
+  return s;
 }
 
 // ═══════════════════════════════════════════════
@@ -662,20 +814,20 @@ async function openToolModal(toolName) {
     const btnGh = document.createElement('button');
     btnGh.className = 'btn btn-ghost btn-sm';
     btnGh.textContent = '🐙 GitHub 仓库';
-    btnGh.onclick = () => window.miseAPI.shell.openExternal(`https://github.com/${tool.github}`);
+    btnGh.onclick = function() { openExternalWithFeedback(`https://github.com/${tool.github}`, this, `${tool.name} GitHub 仓库`); };
     linksEl.appendChild(btnGh);
   }
   if (tool.homepage) {
     const btnHome = document.createElement('button');
     btnHome.className = 'btn btn-ghost btn-sm';
     btnHome.textContent = '🌐 官方网站';
-    btnHome.onclick = () => window.miseAPI.shell.openExternal(tool.homepage);
+    btnHome.onclick = function() { openExternalWithFeedback(tool.homepage, this, `${tool.name} 官网`); };
     linksEl.appendChild(btnHome);
   }
   const btnMkt = document.createElement('button');
   btnMkt.className = 'btn btn-ghost btn-sm';
   btnMkt.textContent = '📋 查看 mise 市场页';
-  btnMkt.onclick = () => window.miseAPI.shell.openExternal(`https://mise-versions.jdx.dev/${toolName}`);
+  btnMkt.onclick = function() { openExternalWithFeedback(`https://mise-versions.jdx.dev/${toolName}`, this, `${toolName} 市场页`); };
   linksEl.appendChild(btnMkt);
 
   // 清理终端与进度条
@@ -949,14 +1101,14 @@ function renderInstalledList(tools) {
                       ? `<button class="btn btn-secondary btn-sm" disabled style="opacity:0.85;cursor:default">
                            ⭐ 已是默认
                          </button>`
-                      : `<button class="btn btn-primary btn-sm" title="执行 mise use -g 设为全局默认版本" onclick="event.stopPropagation();activateToolVersion('${escapeAttr(t.name)}', '${escapeAttr(v.version)}', true, this)">
+                      : `<button class="btn btn-primary btn-sm" title="设为全局默认版本：写入 ~/.config/mise/config.toml，在所有终端直接生效" onclick="event.stopPropagation();activateToolVersion('${escapeAttr(t.name)}', '${escapeAttr(v.version)}', true, this)">
                            🌟 设为全局使用
                          </button>
-                         <button class="btn btn-ghost btn-sm" title="执行 mise use 设为当前项目生效" onclick="event.stopPropagation();activateToolVersion('${escapeAttr(t.name)}', '${escapeAttr(v.version)}', false, this)">
-                           📍 本地使用
+                         <button class="btn btn-ghost btn-sm" title="设为本地项目生效：选择工程目录并生成 .mise.toml，仅在该项目内生效" onclick="event.stopPropagation();activateToolVersion('${escapeAttr(t.name)}', '${escapeAttr(v.version)}', false, this)">
+                           📍 本地项目使用
                          </button>`
                     }
-                    <button class="btn btn-ghost btn-sm" title="在 Windows 资源管理器中打开安装目录" onclick="event.stopPropagation();openVersionFolder('${escapeAttr(v.installPath)}')">
+                    <button class="btn btn-ghost btn-sm" title="在 Windows 资源管理器中打开安装目录" data-install-path="${escapeAttr(v.installPath)}" onclick="event.stopPropagation();openVersionFolderFromEl(this)">
                       📂
                     </button>
                     <button class="btn btn-danger btn-sm" title="卸载此版本" onclick="event.stopPropagation();uninstallTool('${escapeAttr(t.name)}', '${escapeAttr(v.version)}', this)">
@@ -974,14 +1126,34 @@ function renderInstalledList(tools) {
 
 /** 切换使用特定工具版本 (mise use) */
 async function activateToolVersion(toolName, version, isGlobal, btn) {
+  let targetCwd = null;
+  if (!isGlobal) {
+    showToast('请在弹出的窗口中选择需要应用此版本的本地项目文件夹...', 'info', 3000);
+    const selectedDir = await window.miseAPI.dialog.selectDir();
+    if (!selectedDir) {
+      showToast('已取消本地项目版本配置', 'info');
+      return;
+    }
+    targetCwd = selectedDir;
+  }
+
   if (btn) {
     btn.classList.add('loading');
     btn.disabled = true;
   }
   try {
-    const res = await window.miseAPI.mise.use(toolName, version, isGlobal);
+    const res = await window.miseAPI.mise.use(toolName, version, isGlobal, targetCwd);
     if (res.success) {
-      showToast(`已成功将 ${toolName}@${version} 切换为${isGlobal ? '全局' : '本地'}激活版本`, 'success');
+      if (isGlobal) {
+        showToast(`已成功将 ${toolName}@${version} 设为全局默认版本 ✨`, 'success');
+      } else {
+        const folderName = targetCwd.split(/[\\/]/).pop() || targetCwd;
+        showToast(`已成功为项目 [${folderName}] 配置本地版本 ${toolName}@${version} (生成 .mise.toml) ✨`, 'success', 4500);
+        // 自动贴心在资源管理器中定位打开该项目文件夹，让用户第一时间确认
+        setTimeout(() => {
+          window.miseAPI.shell.openPath(targetCwd);
+        }, 300);
+      }
       await loadInstalledTools();
       await loadHomeTools();
     } else {
@@ -997,17 +1169,27 @@ async function activateToolVersion(toolName, version, isGlobal, btn) {
   }
 }
 
+/** 从元素原生属性安全读取路径并打开物理安装文件夹，绝不经过 JS 字符串反斜杠转义 */
+async function openVersionFolderFromEl(btn) {
+  if (!btn) return;
+  const fullPath = btn.getAttribute('data-install-path') || '';
+  await openVersionFolder(fullPath);
+}
+window.openVersionFolderFromEl = openVersionFolderFromEl;
+
 /** 打开指定版本的物理安装文件夹 */
 async function openVersionFolder(fullPath) {
   if (!fullPath) {
     showToast('该版本未找到物理路径', 'warning');
     return;
   }
-  const ok = await window.miseAPI.shell.openPath(fullPath);
+  const cleanPath = String(fullPath).trim();
+  const ok = await window.miseAPI.shell.openPath(cleanPath);
   if (!ok) {
-    showToast('未能打开目录，请确认文件夹是否存在', 'warning');
+    showToast(`未能打开目录，请确认文件夹是否存在: ${cleanPath}`, 'warning', 3500);
   }
 }
+window.openVersionFolder = openVersionFolder;
 
 // ═══════════════════════════════════════════════
 // 设置页：路径自定义、缓存与配置
@@ -1106,11 +1288,12 @@ async function checkAppUpdate() {
       if (resultIcon) resultIcon.textContent = '🎉';
       if (resultTitle) resultTitle.textContent = `发现更高版本可用: v${res.latestVersion} (当前 v${res.currentVersion})`;
       if (resultNotes) {
-        resultNotes.textContent = `【发布日志】\n${res.releaseNotes || '包含性能改进和稳定性优化。'}`;
+        resultNotes.className = 'markdown-body';
+        resultNotes.innerHTML = renderMarkdown(res.releaseNotes || '包含性能改进和稳定性优化。');
       }
       if (resultActions) {
         resultActions.innerHTML = `
-          <button class="btn btn-primary btn-sm" onclick="window.miseAPI.shell.openExternal('${escapeAttr(res.downloadUrl)}')">
+          <button class="btn btn-primary btn-sm" onclick="openExternalWithFeedback('${escapeAttr(res.downloadUrl)}', this, '新版本下载页面')">
             🚀 前往 GitHub 下载安装包
           </button>
           <button class="btn btn-ghost btn-sm" onclick="document.getElementById('update-result-card').style.display='none'">
@@ -1143,7 +1326,7 @@ async function checkAppUpdate() {
       }
       if (resultActions) {
         resultActions.innerHTML = `
-          <button class="btn btn-secondary btn-sm" onclick="window.miseAPI.shell.openExternal('https://github.com/kikock/mise-manager/releases')">
+          <button class="btn btn-secondary btn-sm" onclick="openExternalWithFeedback('https://github.com/kikock/mise-manager/releases', this, 'Releases 页面')">
             🌐 打开 Releases 网页
           </button>
           <button class="btn btn-ghost btn-sm" onclick="document.getElementById('update-result-card').style.display='none'">
@@ -1162,6 +1345,156 @@ async function checkAppUpdate() {
     if (text) text.textContent = '检查应用更新';
   }
 }
+
+// ═══════════════════════════════════════════════
+// 历史发行版本模态框逻辑
+// ═══════════════════════════════════════════════
+
+function closeReleasesModal() {
+  const modal = document.getElementById('releases-modal');
+  if (modal) modal.style.display = 'none';
+  document.body.style.overflow = '';
+}
+
+async function showReleasesModal() {
+  const modal = document.getElementById('releases-modal');
+  if (!modal) return;
+  modal.style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+
+  const bodyEl = document.getElementById('releases-modal-body');
+  const badgeEl = document.getElementById('releases-current-badge');
+  const cacheTag = document.getElementById('releases-cache-tag');
+  const statusTip = document.getElementById('releases-status-tip');
+
+  let currentVer = '1.0.0';
+  try {
+    const vInfo = await window.miseAPI.app.getVersion();
+    if (vInfo && vInfo.version) {
+      currentVer = vInfo.version;
+      if (badgeEl) badgeEl.textContent = `v${currentVer}`;
+    }
+  } catch (e) {}
+
+  bodyEl.innerHTML = `
+    <div class="empty-state" style="padding:40px 0">
+      <div class="empty-icon" style="animation:spin 1s linear infinite;display:inline-block">🔄</div>
+      <div class="empty-title" style="margin-top:10px">正在获取历史发行版本...</div>
+      <div style="font-size:12px;color:var(--text-tertiary);margin-top:6px">如遇网络受限将自动提供本地降级列表</div>
+    </div>
+  `;
+
+  try {
+    const res = await window.miseAPI.app.getReleases();
+    if (cacheTag) cacheTag.style.display = res.fromCache ? 'inline-block' : 'none';
+
+    const releases = (res && res.releases && res.releases.length > 0)
+      ? res.releases
+      : (res.cachedReleases || []);
+
+    if (releases.length === 0) {
+      bodyEl.innerHTML = `
+        <div style="padding:16px;background:var(--bg-tertiary);border:1px solid var(--border);border-radius:var(--radius-md);margin-bottom:12px">
+          <div class="flex-between" style="align-items:center;margin-bottom:8px">
+            <div class="flex gap-8" style="align-items:center">
+              <span class="badge badge-success" style="font-size:13px;padding:3px 10px">v${currentVer}</span>
+              <span style="font-weight:600;font-size:14px">当前安装版本 (官方正式发布)</span>
+            </div>
+            <span style="font-size:11.5px;color:var(--text-tertiary)">本地已知</span>
+          </div>
+          <div style="font-size:12.5px;color:var(--text-secondary);line-height:1.6;margin-bottom:12px">
+            由于网络连接受限，未能从 GitHub Releases 抓取历史发布流。<br>
+            您可直接在外部浏览器中访问 GitHub 专页查看或下载最新历史构建。
+          </div>
+          <div class="flex gap-8">
+            <button class="btn btn-primary btn-sm" onclick="openExternalWithFeedback('https://github.com/kikock/mise-manager/releases', this, 'Releases')">
+              🚀 浏览器打开 Releases
+            </button>
+            <button class="btn btn-ghost btn-sm" onclick="showReleasesModal()">
+              🔄 重试同步
+            </button>
+          </div>
+        </div>
+      `;
+      if (statusTip) statusTip.textContent = `提示: ${res.error || '无法直连 GitHub API'}`;
+      return;
+    }
+
+    let html = '';
+    releases.forEach((r, idx) => {
+      const isCurrent = (r.tag === currentVer || r.tagName === `v${currentVer}`);
+      const pubDate = r.publishedAt 
+        ? new Date(r.publishedAt).toLocaleDateString('zh-CN', { year:'numeric', month:'2-digit', day:'2-digit' }) 
+        : '官方发布';
+      const safeBody = (r.body || '包含性能改进和稳定性优化。')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+
+      const assetListHtml = (r.assets && r.assets.length > 0)
+        ? `
+          <div style="margin-top:10px;padding-top:10px;border-top:1px dashed var(--border)">
+            <div style="font-size:11.5px;color:var(--text-secondary);margin-bottom:6px;font-weight:600">📦 安装包产物与安装文件:</div>
+            <div class="flex gap-8" style="flex-wrap:wrap">
+              ${r.assets.map(a => {
+                const mb = (a.size / (1024 * 1024)).toFixed(1);
+                return `
+                  <button class="btn btn-secondary btn-sm" style="font-size:11px;padding:3px 9px" onclick="openExternalWithFeedback('${escapeAttr(a.downloadUrl)}', this, '${escapeAttr(a.name)}')">
+                    ⬇️ ${escapeHtml(a.name)} <span style="opacity:0.7">(${mb}MB)</span>
+                  </button>
+                `;
+              }).join('')}
+            </div>
+          </div>
+        `
+        : '';
+
+      html += `
+        <div style="padding:16px 18px;background:var(--bg-tertiary);border:1px solid ${isCurrent ? 'var(--accent)' : 'var(--border)'};border-radius:var(--radius-md);margin-bottom:12px">
+          <div class="flex-between" style="align-items:center;margin-bottom:8px">
+            <div class="flex gap-8" style="align-items:center">
+              <span class="badge ${isCurrent ? 'badge-success' : 'badge-neutral'}" style="font-size:13px;font-weight:700;padding:2px 9px">
+                ${escapeHtml(r.tagName || ('v' + r.tag))}
+              </span>
+              <span style="font-weight:600;font-size:13.5px;color:var(--text-primary)">
+                ${escapeHtml(r.name || r.tagName)}
+              </span>
+              ${isCurrent ? '<span class="badge badge-info" style="font-size:10.5px;padding:1px 6px">当前使用</span>' : ''}
+              ${r.isPrerelease ? '<span class="badge badge-warning" style="font-size:10.5px;padding:1px 6px">预发布</span>' : ''}
+            </div>
+            <span style="font-size:11.5px;color:var(--text-tertiary)">${pubDate}</span>
+          </div>
+          <div class="markdown-body" style="max-height:180px;overflow-y:auto;background:var(--bg-card);padding:10px 14px;border-radius:var(--radius-sm);border:1px solid rgba(255,255,255,0.03)">${renderMarkdown(r.body || '包含多项体验优化与稳定性修复。')}</div>
+          ${assetListHtml}
+          <div style="margin-top:10px;display:flex;justify-content:flex-end;gap:8px">
+            <button class="btn btn-ghost btn-sm" style="font-size:11.5px" onclick="openExternalWithFeedback('${escapeAttr(r.htmlUrl || 'https://github.com/kikock/mise-manager/releases')}', this, 'GitHub Release 页面')">
+              🔗 在 GitHub 查看发布详情
+            </button>
+          </div>
+        </div>
+      `;
+    });
+
+    bodyEl.innerHTML = html;
+    if (statusTip) {
+      statusTip.textContent = res.fromCache 
+        ? '⚡ 已从本地高速缓存瞬间加载 · 共 ' + releases.length + ' 个版本记录' 
+        : '✨ 已实时同步官方发布记录 · 共 ' + releases.length + ' 个版本记录';
+    }
+  } catch (err) {
+    bodyEl.innerHTML = `
+      <div class="empty-state" style="padding:30px 0">
+        <div class="empty-icon">⚠️</div>
+        <div class="empty-title">获取版本列表失败</div>
+        <div style="font-size:12px;color:var(--text-secondary);margin:8px 0 16px">${escapeHtml(err.message || '网络连接异常')}</div>
+        <button class="btn btn-primary btn-sm" onclick="openExternalWithFeedback('https://github.com/kikock/mise-manager/releases', this, 'Releases')">
+          🌐 直接在浏览器中访问 GitHub Releases
+        </button>
+      </div>
+    `;
+  }
+}
+
 
 /** 检测 Windows 用户环境变量状态 */
 async function checkEnvStatus() {
@@ -1406,8 +1739,11 @@ function bindEvents() {
   document.getElementById('btn-refresh-status').onclick = checkMiseStatus;
   document.getElementById('btn-install-mise').onclick   = installMise;
   document.getElementById('btn-upgrade-mise').onclick   = upgradeMise;
-  document.getElementById('btn-open-config').onclick    = () => {
-    if (AppState.miseDataDir) window.miseAPI.shell.openExternal(AppState.miseDataDir);
+  document.getElementById('btn-open-config').onclick    = async () => {
+    if (AppState.miseDataDir) {
+      const ok = await window.miseAPI.shell.openPath(AppState.miseDataDir);
+      if (!ok) window.miseAPI.shell.openExternal(AppState.miseDataDir);
+    }
   };
   document.getElementById('btn-change-install-dir').onclick = async () => {
     const dir = await window.miseAPI.dialog.selectDir();
@@ -1464,8 +1800,11 @@ function bindEvents() {
   };
   document.getElementById('btn-save-mise-paths').onclick = saveMisePaths;
   document.getElementById('btn-reset-mise-paths').onclick = resetMisePaths;
-  document.getElementById('btn-open-mise-data-dir').onclick = () => {
-    if (AppState.miseDataDir) window.miseAPI.shell.openExternal(AppState.miseDataDir);
+  document.getElementById('btn-open-mise-data-dir').onclick = async () => {
+    if (AppState.miseDataDir) {
+      const ok = await window.miseAPI.shell.openPath(AppState.miseDataDir);
+      if (!ok) window.miseAPI.shell.openExternal(AppState.miseDataDir);
+    }
   };
 
   // 卸载 mise 按钮（首页与设置页）
@@ -1574,18 +1913,52 @@ function bindEvents() {
 
   // 应用版本更新与发行版查看
   document.getElementById('btn-check-app-update')?.addEventListener('click', checkAppUpdate);
-  document.getElementById('btn-view-releases')?.addEventListener('click', () => {
-    window.miseAPI.shell.openExternal('https://github.com/kikock/mise-manager/releases');
+  document.getElementById('btn-view-releases')?.addEventListener('click', showReleasesModal);
+
+  // 历史发行版本模态框事件
+  document.getElementById('releases-modal-close')?.addEventListener('click', closeReleasesModal);
+  document.getElementById('releases-modal-cancel')?.addEventListener('click', closeReleasesModal);
+  document.getElementById('releases-modal')?.addEventListener('click', (e) => {
+    if (e.target === document.getElementById('releases-modal')) closeReleasesModal();
+  });
+  document.getElementById('btn-releases-open-browser')?.addEventListener('click', function() {
+    openExternalWithFeedback('https://github.com/kikock/mise-manager/releases', this, 'GitHub Releases 页面');
   });
 
-  // 外部链接
-  document.getElementById('btn-mise-docs').onclick = () => window.miseAPI.shell.openExternal('https://mise.jdx.dev');
-  document.getElementById('btn-mise-github').onclick = () => window.miseAPI.shell.openExternal('https://github.com/jdx/mise');
-  document.getElementById('btn-mise-versions-site').onclick = () => window.miseAPI.shell.openExternal('https://mise-versions.jdx.dev');
+  // 底部外部链接
+  document.getElementById('btn-mise-docs').onclick = function() { openExternalWithFeedback('https://mise.jdx.dev', this, 'Mise 官方文档'); };
+  document.getElementById('btn-mise-github').onclick = function() { openExternalWithFeedback('https://github.com/jdx/mise', this, 'Mise GitHub 源码'); };
+  document.getElementById('btn-mise-versions-github').onclick = function() { openExternalWithFeedback('https://github.com/jdx/mise-versions', this, 'mise-versions 生态源码'); };
+  document.getElementById('btn-mise-versions-site').onclick = function() { openExternalWithFeedback('https://mise-versions.jdx.dev', this, '生态索引市场'); };
+
+  // 开发者与开源致谢外部链接
+  document.getElementById('link-author-badge')?.addEventListener('click', function(e) {
+    e.preventDefault();
+    openExternalWithFeedback('https://github.com/kikock', this, 'kikock GitHub 主页');
+  });
+  document.getElementById('btn-author-kikock')?.addEventListener('click', function(e) {
+    e.preventDefault();
+    openExternalWithFeedback('https://github.com/kikock', this, 'kikock GitHub 主页');
+  });
+  document.getElementById('btn-github-kikock')?.addEventListener('click', function(e) {
+    e.preventDefault();
+    openExternalWithFeedback('https://github.com/kikock', this, 'kikock GitHub 主页');
+  });
+  document.getElementById('btn-project-repo')?.addEventListener('click', function(e) {
+    e.preventDefault();
+    openExternalWithFeedback('https://github.com/kikock/mise-manager', this, 'Mise Manager 源码仓库');
+  });
+  document.getElementById('btn-thanks-mise-versions')?.addEventListener('click', function(e) {
+    e.preventDefault();
+    openExternalWithFeedback('https://github.com/jdx/mise-versions', this, 'jdx/mise-versions 生态源码');
+  });
 
   // 快捷键与网络
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') closeModal();
+    if (e.key === 'Escape') {
+      closeModal();
+      closeReleasesModal();
+    }
   });
   window.addEventListener('online', checkNetwork);
   window.addEventListener('offline', checkNetwork);
