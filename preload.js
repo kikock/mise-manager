@@ -11,11 +11,13 @@ contextBridge.exposeInMainWorld('miseAPI', {
 
   // mise 操作
   mise: {
-    check:   () => ipcRenderer.invoke('mise:check'),
-    where:   (toolVersion) => ipcRenderer.invoke('mise:where', toolVersion),
-    exec:    (args) => ipcRenderer.invoke('mise:exec', args),
-    install: (options) => ipcRenderer.invoke('mise:install', options),
-    uninstall: () => ipcRenderer.invoke('mise:uninstall'),
+    check:         () => ipcRenderer.invoke('mise:check'),
+    where:         (toolVersion) => ipcRenderer.invoke('mise:where', toolVersion),
+    listInstalled: () => ipcRenderer.invoke('mise:listInstalled'),
+    use:           (tool, version, isGlobal) => ipcRenderer.invoke('mise:use', { tool, version, isGlobal }),
+    exec:          (args) => ipcRenderer.invoke('mise:exec', args),
+    install:       (options) => ipcRenderer.invoke('mise:install', options),
+    uninstall:     () => ipcRenderer.invoke('mise:uninstall'),
     onStream: (callback) => {
       ipcRenderer.on('mise:stream', (event, data) => callback(data));
     },
@@ -57,8 +59,9 @@ contextBridge.exposeInMainWorld('miseAPI', {
     selectDir: () => ipcRenderer.invoke('dialog:selectDir'),
   },
 
-  // 外部链接
+  // 外部链接与本地路径
   shell: {
     openExternal: (url) => ipcRenderer.invoke('shell:openExternal', url),
+    openPath:     (fullPath) => ipcRenderer.invoke('shell:openPath', fullPath),
   },
 });

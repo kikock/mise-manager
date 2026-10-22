@@ -291,10 +291,12 @@ async function loadHomeTools() {
     return;
   }
 
-  const result = await window.miseAPI.mise.exec(['ls', '--current']);
-  const tools = parseToolsList(result.output || '');
+  const res = await window.miseAPI.mise.listInstalled();
+  const tools = res.success ? res.tools : [];
   AppState.installedTools = tools;
-  subtitle.textContent = `当前已安装 ${tools.length} 个工具`;
+
+  const totalVersions = tools.reduce((sum, t) => sum + (t.versions ? t.versions.length : 1), 0);
+  subtitle.textContent = `已扫描到 ${tools.length} 个开发工具，共 ${totalVersions} 个本地版本`;
 
   const countBadge = document.getElementById('installed-count');
   if (countBadge) {
@@ -311,29 +313,25 @@ async function loadHomeTools() {
     return;
   }
 
-  grid.innerHTML = tools.slice(0, 8).map(t => `
-    <div class="tool-card" style="cursor:pointer;padding:14px" onclick="openToolModal('${escapeAttr(t.name)}')">
+  grid.innerHTML = tools.slice(0, 8).map(t => {
+    const activeVer = t.activeVersion;
+    const verCount = t.versions ? t.versions.length : 1;
+    return `
+    <div class="tool-card" style="cursor:pointer;padding:14px" onclick="navigateTo('installed')">
       <div class="flex gap-10" style="align-items:center">
         <span style="font-size:24px">${getToolEmoji(t.name)}</span>
         <div style="flex:1;min-width:0">
           <div class="tool-name" style="font-size:14px">${escapeHtml(t.name)}</div>
-          <div class="tool-version" style="font-size:12px">${escapeHtml(t.version)}</div>
+          <div class="tool-version" style="font-size:12px;color:${activeVer ? 'var(--accent)' : 'var(--text-tertiary)'}">
+            ${activeVer ? `当前激活: ${escapeHtml(activeVer)}` : '未激活 (点击配置)'}
+          </div>
         </div>
-        <span class="badge badge-success" style="font-size:10.5px">已安装</span>
+        <span class="badge ${activeVer ? 'badge-success' : 'badge-neutral'}" style="font-size:10.5px">
+          ${verCount} 个版本
+        </span>
       </div>
-    </div>`).join('');
-}
-
-function parseToolsList(output) {
-  const tools = [];
-  const lines = String(output || '').split('\n').filter(l => l.trim());
-  for (const line of lines) {
-    const parts = line.trim().split(/\s+/);
-    if (parts.length >= 2 && !parts[0].startsWith('Plugin') && !parts[0].startsWith('Tool')) {
-      tools.push({ name: parts[0], version: parts[1] });
-    }
-  }
-  return tools;
+    </div>`;
+  }).join('');
 }
 
 // ═══════════════════════════════════════════════
@@ -418,9 +416,24 @@ async function loadMarket(forceRefresh = false) {
   // 监听分页拉取进度
   window.miseAPI.market.onProgress((data) => {
     progressBarWrap.style.display = 'block';
-    const percent = Math.round((data.current / data.total) * 100);
+    const percent = data.total > 0 ? Math.round((data.current / data.total) * 100) : 0;
     progressFill.style.width = `${percent}%`;
     progressText.textContent = `第 ${data.current} / ${data.total} 页 · 已拉取 ${data.count} 个工具`;
+
+    // 同步更新设置页中的动画进度条
+    const setBox = document.getElementById('settings-sync-progress');
+    const setFill = document.getElementById('settings-sync-progress-fill');
+    const setPercent = document.getElementById('settings-sync-percent');
+    const setStatus = document.getElementById('settings-sync-status-text');
+    const setDetail = document.getElementById('settings-sync-detail');
+    const setCount = document.getElementById('settings-sync-count');
+    if (setBox && setBox.style.display !== 'none') {
+      if (setFill) setFill.style.width = `${percent}%`;
+      if (setPercent) setPercent.textContent = `${percent}%`;
+      if (setStatus) setStatus.textContent = `🔄 正在全量同步工具生态数据 (${percent}%)...`;
+      if (setDetail) setDetail.textContent = `第 ${data.current} / ${data.total} 页`;
+      if (setCount) setCount.textContent = `已收录 ${data.count} / ${data.totalCount || '?'} 个工具`;
+    }
   });
 
   countEl.textContent = '正在获取官方工具列表...';
@@ -610,9 +623,8 @@ async function loadToolVersions(toolName, tool) {
   progressBar.style.display = 'none';
 
   // 读取已安装版本
-  const installedVersions = AppState.installedTools
-    .filter(t => t.name === toolName)
-    .map(t => t.version);
+  const toolEntry = AppState.installedTools.find(t => t.name === toolName);
+  const installedVersions = toolEntry && toolEntry.versions ? toolEntry.versions.map(v => v.version) : [];
 
   if (!result.success || !result.versions || result.versions.length === 0) {
     versionList.innerHTML = `<div class="empty-state" style="padding:30px">
@@ -748,7 +760,7 @@ function closeModal() {
 
 async function loadInstalledTools() {
   const container = document.getElementById('installed-list-container');
-  container.innerHTML = `<div class="empty-state"><div class="empty-icon">⏳</div><div class="empty-title">正在检测本地工具...</div></div>`;
+  container.innerHTML = `<div class="empty-state"><div class="empty-icon">⏳</div><div class="empty-title">正在全面扫描本地已安装与启用工具...</div></div>`;
 
   // 同步展示当前扫描的生效目录
   try {
@@ -767,8 +779,8 @@ async function loadInstalledTools() {
     return;
   }
 
-  const result = await window.miseAPI.mise.exec(['ls', '--current']);
-  const tools = parseToolsList(result.output || '');
+  const res = await window.miseAPI.mise.listInstalled();
+  const tools = res.success ? res.tools : [];
   AppState.installedTools = tools;
   AppState.installedLoaded = true;
 
@@ -783,7 +795,7 @@ async function loadInstalledTools() {
 
 function renderInstalledList(tools) {
   const container = document.getElementById('installed-list-container');
-  if (tools.length === 0) {
+  if (!tools || tools.length === 0) {
     container.innerHTML = `<div class="empty-state">
       <div class="empty-icon">📦</div>
       <div class="empty-title">未检索到已安装的工具</div>
@@ -794,27 +806,127 @@ function renderInstalledList(tools) {
   }
 
   container.innerHTML = `
-    <div class="tool-grid">
-      ${tools.map(t => `
-        <div class="tool-card" onclick="openToolModal('${escapeAttr(t.name)}')">
-          <div class="flex gap-12" style="align-items:center">
-            <span style="font-size:32px">${getToolEmoji(t.name)}</span>
-            <div style="flex:1;min-width:0">
-              <div class="tool-name">${escapeHtml(t.name)}</div>
-              <div class="tool-version">${escapeHtml(t.version)}</div>
+    <div style="display:flex;flex-direction:column;gap:16px">
+      ${tools.map(t => {
+        const versions = t.versions || [];
+        const activeVer = t.activeVersion;
+        return `
+        <div class="card" style="padding:16px 20px;border-left:4px solid ${activeVer ? 'var(--accent)' : 'var(--border)'}">
+          <!-- 卡片顶栏 -->
+          <div class="flex-between" style="align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:14px">
+            <div class="flex gap-12" style="align-items:center">
+              <span style="font-size:32px">${getToolEmoji(t.name)}</span>
+              <div>
+                <div class="flex gap-8" style="align-items:center;flex-wrap:wrap">
+                  <span class="tool-name" style="font-size:16px;font-weight:600">${escapeHtml(t.name)}</span>
+                  ${activeVer 
+                    ? `<span class="badge badge-success" style="font-size:11px">⭐ 当前激活: ${escapeHtml(activeVer)}</span>`
+                    : `<span class="badge badge-warning" style="font-size:11px;background:rgba(255,185,0,0.15);color:#ffb900">⚠️ 未激活任何版本</span>`
+                  }
+                  <span class="badge badge-neutral" style="font-size:11px">共 ${versions.length} 个已安装版本</span>
+                </div>
+                <div style="font-size:12px;color:var(--text-tertiary);margin-top:3px">
+                  ${activeVer ? '当前激活版本已生效于全局环境变量，命令行可直接调起' : '已下载至本地目录，点击下方版本按钮即可一键激活'}
+                </div>
+              </div>
             </div>
-            <span class="badge badge-success">已安装</span>
+            <div class="flex gap-8" style="align-items:center">
+              <button class="btn btn-ghost btn-sm" onclick="openToolModal('${escapeAttr(t.name)}')">
+                🏪 安装其他版本
+              </button>
+            </div>
           </div>
-          <div class="flex gap-8 mt-12">
-            <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();setGlobal('${escapeAttr(t.name)}','${escapeAttr(t.version)}',this)">
-              🌐 设为默认
-            </button>
-            <button class="btn btn-danger btn-sm" onclick="event.stopPropagation();uninstallTool('${escapeAttr(t.name)}','${escapeAttr(t.version)}',this)">
-              🗑️ 卸载
-            </button>
+
+          <!-- 版本矩阵列表 -->
+          <div style="background:var(--bg-tertiary);border-radius:var(--radius-sm);border:1px solid var(--border);overflow:hidden">
+            <div style="padding:8px 14px;background:rgba(255,255,255,0.02);border-bottom:1px solid var(--border);font-size:11.5px;font-weight:600;color:var(--text-tertiary);display:flex;justify-content:space-between">
+              <span>本地版本与物理存储路径</span>
+              <span>版本切换控制 (mise use)</span>
+            </div>
+            <div style="display:flex;flex-direction:column">
+              ${versions.map(v => {
+                const isActive = v.active;
+                return `
+                <div class="flex-between" style="padding:10px 14px;align-items:center;border-bottom:1px solid rgba(255,255,255,0.04);background:${isActive ? 'rgba(0,120,212,0.07)' : 'transparent'}">
+                  <div style="display:flex;flex-direction:column;gap:3px;min-width:0;flex:1;padding-right:12px">
+                    <div class="flex gap-8" style="align-items:center">
+                      <span style="font-family:var(--font-mono);font-size:13.5px;font-weight:${isActive ? '700' : '500'};color:${isActive ? 'var(--accent)' : 'var(--text-primary)'}">
+                        ${escapeHtml(v.version)}
+                      </span>
+                      ${isActive 
+                        ? `<span class="badge badge-success" style="font-size:10px;padding:2px 6px">当前使用中 (Active)</span>` 
+                        : `<span style="font-size:11px;color:var(--text-tertiary)">未激活</span>`
+                      }
+                      ${v.source ? `<span style="font-size:10.5px;color:var(--text-tertiary);font-family:var(--font-mono)" title="${escapeAttr(v.source)}">(${escapeHtml(v.source.split(/[\\\\/]/).pop())})</span>` : ''}
+                    </div>
+                    <div style="font-size:11px;color:var(--text-tertiary);font-family:var(--font-mono);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeAttr(v.installPath || '')}">
+                      📁 ${escapeHtml(v.installPath || '未知路径')}
+                    </div>
+                  </div>
+
+                  <div class="flex gap-6" style="align-items:center;flex-shrink:0">
+                    ${isActive
+                      ? `<button class="btn btn-secondary btn-sm" disabled style="opacity:0.85;cursor:default">
+                           ⭐ 已是默认
+                         </button>`
+                      : `<button class="btn btn-primary btn-sm" title="执行 mise use -g 设为全局默认版本" onclick="event.stopPropagation();activateToolVersion('${escapeAttr(t.name)}', '${escapeAttr(v.version)}', true, this)">
+                           🌟 设为全局使用
+                         </button>
+                         <button class="btn btn-ghost btn-sm" title="执行 mise use 设为当前项目生效" onclick="event.stopPropagation();activateToolVersion('${escapeAttr(t.name)}', '${escapeAttr(v.version)}', false, this)">
+                           📍 本地使用
+                         </button>`
+                    }
+                    <button class="btn btn-ghost btn-sm" title="在 Windows 资源管理器中打开安装目录" onclick="event.stopPropagation();openVersionFolder('${escapeAttr(v.installPath)}')">
+                      📂
+                    </button>
+                    <button class="btn btn-danger btn-sm" title="卸载此版本" onclick="event.stopPropagation();uninstallTool('${escapeAttr(t.name)}', '${escapeAttr(v.version)}', this)">
+                      🗑️
+                    </button>
+                  </div>
+                </div>`;
+              }).join('')}
+            </div>
           </div>
-        </div>`).join('')}
+        </div>`;
+      }).join('')}
     </div>`;
+}
+
+/** 切换使用特定工具版本 (mise use) */
+async function activateToolVersion(toolName, version, isGlobal, btn) {
+  if (btn) {
+    btn.classList.add('loading');
+    btn.disabled = true;
+  }
+  try {
+    const res = await window.miseAPI.mise.use(toolName, version, isGlobal);
+    if (res.success) {
+      showToast(`已成功将 ${toolName}@${version} 切换为${isGlobal ? '全局' : '本地'}激活版本`, 'success');
+      await loadInstalledTools();
+      await loadHomeTools();
+    } else {
+      showToast('切换版本失败: ' + (res.error || res.output), 'error');
+    }
+  } catch (err) {
+    showToast('执行异常: ' + err.message, 'error');
+  } finally {
+    if (btn) {
+      btn.classList.remove('loading');
+      btn.disabled = false;
+    }
+  }
+}
+
+/** 打开指定版本的物理安装文件夹 */
+async function openVersionFolder(fullPath) {
+  if (!fullPath) {
+    showToast('该版本未找到物理路径', 'warning');
+    return;
+  }
+  const ok = await window.miseAPI.shell.openPath(fullPath);
+  if (!ok) {
+    showToast('未能打开目录，请确认文件夹是否存在', 'warning');
+  }
 }
 
 // ═══════════════════════════════════════════════
@@ -1127,7 +1239,10 @@ function bindEvents() {
   document.getElementById('btn-refresh-installed').onclick = loadInstalledTools;
   document.getElementById('installed-search')?.addEventListener('input', (e) => {
     const q = e.target.value.trim().toLowerCase();
-    const filtered = AppState.installedTools.filter(t => t.name.toLowerCase().includes(q));
+    const filtered = AppState.installedTools.filter(t => 
+      t.name.toLowerCase().includes(q) ||
+      (t.versions && t.versions.some(v => v.version.toLowerCase().includes(q)))
+    );
     renderInstalledList(filtered);
   });
 
@@ -1208,8 +1323,43 @@ function bindEvents() {
 
   // 市场缓存按钮
   document.getElementById('btn-refresh-cache').onclick = async () => {
-    await loadMarket(true);
-    await loadCacheInfo();
+    const btn = document.getElementById('btn-refresh-cache');
+    const setBox = document.getElementById('settings-sync-progress');
+    const setFill = document.getElementById('settings-sync-progress-fill');
+    const setPercent = document.getElementById('settings-sync-percent');
+    const setStatus = document.getElementById('settings-sync-status-text');
+    const setDetail = document.getElementById('settings-sync-detail');
+    const setCount = document.getElementById('settings-sync-count');
+
+    btn.classList.add('loading');
+    btn.disabled = true;
+    if (setBox) setBox.style.display = 'block';
+    if (setFill) {
+      setFill.style.width = '0%';
+      setFill.classList.remove('indeterminate');
+    }
+    if (setPercent) setPercent.textContent = '0%';
+    if (setStatus) setStatus.textContent = '🚀 正在建立与官方数据源连接...';
+    if (setDetail) setDetail.textContent = '准备拉取分页...';
+    if (setCount) setCount.textContent = '0 个工具';
+
+    try {
+      await loadMarket(true);
+      await loadCacheInfo();
+      if (setFill) setFill.style.width = '100%';
+      if (setPercent) setPercent.textContent = '100%';
+      if (setStatus) setStatus.textContent = '✅ 官方生态全量数据已成功同步！';
+      showToast('官方工具生态已完成全量同步', 'success');
+      setTimeout(() => {
+        if (setBox) setBox.style.display = 'none';
+      }, 2500);
+    } catch (e) {
+      if (setStatus) setStatus.textContent = '❌ 同步失败: ' + e.message;
+      showToast('同步失败，请检查网络或代理设置', 'error');
+    } finally {
+      btn.classList.remove('loading');
+      btn.disabled = false;
+    }
   };
   document.getElementById('btn-clear-cache').onclick = async () => {
     const ok = await window.miseAPI.market.clearCache();

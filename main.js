@@ -326,6 +326,109 @@ ipcMain.handle('mise:where', async (event, toolVersion) => {
 });
 
 // ─────────────────────────────────────────────
+// IPC 处理器：扫描并获取所有已安装与启用的工具及其完整版本
+// ─────────────────────────────────────────────
+ipcMain.handle('mise:listInstalled', async () => {
+  return new Promise((resolve) => {
+    const miseExe = getMiseBinPath();
+    const env = buildMiseEnv();
+    const dataDir = getMiseDataDir();
+    const installsDir = path.join(dataDir, 'installs');
+
+    exec(`"${miseExe}" ls --installed --json`, { shell: true, env, maxBuffer: 10 * 1024 * 1024 }, (err, stdout) => {
+      const toolsMap = {};
+      try {
+        if (stdout && stdout.trim()) {
+          const raw = JSON.parse(stdout.trim());
+          for (const [toolName, versionsList] of Object.entries(raw)) {
+            if (!Array.isArray(versionsList)) continue;
+            toolsMap[toolName] = versionsList.map(v => ({
+              version: v.version,
+              installPath: v.install_path || path.join(installsDir, toolName, v.version),
+              installed: v.installed !== false,
+              active: !!v.active,
+              source: v.source?.path || null,
+              requestedVersion: v.requested_version || null,
+            }));
+          }
+        }
+      } catch (e) {
+        console.error('解析 mise ls JSON 失败:', e);
+      }
+
+      // 双重保险：检查物理 installs 目录补充可能漏掉的本地版本
+      if (fs.existsSync(installsDir)) {
+        try {
+          const toolDirs = fs.readdirSync(installsDir, { withFileTypes: true });
+          for (const tDir of toolDirs) {
+            if (!tDir.isDirectory()) continue;
+            const toolName = tDir.name;
+            if (!toolsMap[toolName]) toolsMap[toolName] = [];
+            
+            const toolSubDir = path.join(installsDir, toolName);
+            const verDirs = fs.readdirSync(toolSubDir, { withFileTypes: true });
+            for (const vDir of verDirs) {
+              if (!vDir.isDirectory()) continue;
+              const vName = vDir.name;
+              const existing = toolsMap[toolName].find(x => x.version === vName);
+              if (!existing) {
+                toolsMap[toolName].push({
+                  version: vName,
+                  installPath: path.join(toolSubDir, vName),
+                  installed: true,
+                  active: false,
+                  source: null,
+                  requestedVersion: null,
+                });
+              }
+            }
+          }
+        } catch (e) {
+          console.error('扫描物理 installs 目录异常:', e);
+        }
+      }
+
+      // 转换为数组并排序，标明当前活跃版本
+      const resultList = Object.keys(toolsMap).sort().map(toolName => {
+        const versions = toolsMap[toolName];
+        const activeVerObj = versions.find(v => v.active);
+        return {
+          name: toolName,
+          activeVersion: activeVerObj ? activeVerObj.version : null,
+          versions: versions.sort((a, b) => b.version.localeCompare(a.version, undefined, { numeric: true })),
+        };
+      });
+
+      resolve({ success: true, tools: resultList, count: resultList.length });
+    });
+  });
+});
+
+// ─────────────────────────────────────────────
+// IPC 处理器：版本切换与激活 (mise use)
+// ─────────────────────────────────────────────
+ipcMain.handle('mise:use', async (event, { tool, version, isGlobal = true }) => {
+  return new Promise((resolve) => {
+    const miseExe = getMiseBinPath();
+    const env = buildMiseEnv();
+    const flag = isGlobal ? '-g' : '';
+    const cmd = `"${miseExe}" use ${flag} ${tool}@${version}`;
+
+    exec(cmd, { shell: true, env }, (err, stdout, stderr) => {
+      const out = stdout || stderr || '';
+      if (mainWindow) {
+        mainWindow.webContents.send('mise:stream', `[mise use] ${cmd}\r\n${out}\r\n`);
+      }
+      if (err) {
+        resolve({ success: false, output: out, error: err.message });
+      } else {
+        resolve({ success: true, output: out });
+      }
+    });
+  });
+});
+
+// ─────────────────────────────────────────────
 // IPC 处理器：配置管理
 // ─────────────────────────────────────────────
 ipcMain.handle('config:get', async () => {
@@ -679,8 +782,16 @@ ipcMain.handle('market:fetchVersions', async (event, toolName) => {
 });
 
 // ─────────────────────────────────────────────
-// IPC 处理器：打开外部链接
+// IPC 处理器：打开外部链接与物理目录
 // ─────────────────────────────────────────────
 ipcMain.handle('shell:openExternal', (event, url) => {
   shell.openExternal(url);
+});
+
+ipcMain.handle('shell:openPath', async (event, fullPath) => {
+  if (fullPath && fs.existsSync(fullPath)) {
+    await shell.openPath(fullPath);
+    return true;
+  }
+  return false;
 });

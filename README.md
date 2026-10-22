@@ -2,7 +2,7 @@
 
 <div align="center">
 
-<img src="renderer/assets/icon.ico" width="84" height="84" alt="Mise Manager Logo" />
+<img src="renderer/assets/icon.png" width="84" height="84" alt="Mise Manager Logo" />
 
 ###  mise 桌面版本管理器
 
