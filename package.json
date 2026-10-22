@@ -7,7 +7,10 @@
   "scripts": {
     "start": "electron .",
     "dev": "electron . --dev",
-    "build": "electron-builder --win nsis --x64 --publish never"
+    "build": "electron-builder --win --x64 --publish never",
+    "build:nsis": "electron-builder --win nsis --x64 --publish never",
+    "build:portable": "electron-builder --win portable --x64 --publish never",
+    "build:zip": "electron-builder --win zip --x64 --publish never"
   },
   "devDependencies": {
     "electron": "^32.0.0",
@@ -39,6 +42,18 @@
           "arch": [
             "x64"
           ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "x64"
+          ]
         }
       ]
     },
@@ -50,6 +65,12 @@
       "shortcutName": "mise-manager",
       "uninstallDisplayName": "mise-manager",
       "artifactName": "mise-manager-setup-${version}.${ext}"
+    },
+    "portable": {
+      "artifactName": "mise-manager-portable-${version}.${ext}"
+    },
+    "zip": {
+      "artifactName": "mise-manager-${version}-win-${arch}.${ext}"
     }
   }
 }

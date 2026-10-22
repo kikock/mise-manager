@@ -123,7 +123,7 @@ jobs:
       - name: Install Dependencies
         run: yarn install --immutable
 
-      - name: Build Application (Windows NSIS)
+      - name: Build Application (Windows NSIS, Portable & Zip)
         env:
           GH_TOKEN: ${{ secrets.TOKEN || secrets.GITHUB_TOKEN }}
         run: yarn build --publish never
@@ -135,7 +135,9 @@ jobs:
           $patterns = @(
             'dist/latest.yml',
             'dist/mise-manager-setup-*.exe',
-            'dist/mise-manager-setup-*.exe.blockmap'
+            'dist/mise-manager-setup-*.exe.blockmap',
+            'dist/mise-manager-portable-*.exe',
+            'dist/mise-manager-*-win-x64.zip'
           )
 
           foreach ($pattern in $patterns) {
@@ -157,8 +159,10 @@ jobs:
             Get-ChildItem 'dist/latest.yml' | Select-Object -ExpandProperty FullName
             Get-ChildItem 'dist/mise-manager-setup-*.exe' | Select-Object -ExpandProperty FullName
             Get-ChildItem 'dist/mise-manager-setup-*.exe.blockmap' | Select-Object -ExpandProperty FullName
+            Get-ChildItem 'dist/mise-manager-portable-*.exe' | Select-Object -ExpandProperty FullName
+            Get-ChildItem 'dist/mise-manager-*-win-x64.zip' | Select-Object -ExpandProperty FullName
           )
 
-          Write-Host "正在上传 Windows 构建产物到 Release: $env:RELEASE_TAG"
+          Write-Host "正在上传 Windows 产物 (安装版 + 便携单文件 + 绿色解压包) 到 Release: $env:RELEASE_TAG"
           gh release upload $env:RELEASE_TAG @files --clobber
-          Write-Host "🎉 上传成功完成！"
+          Write-Host "🎉 全部产物上传成功完成！"

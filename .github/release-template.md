@@ -17,13 +17,15 @@
 
 ### 📥 资产安装指南
 
-| 安装程序 | 适用系统 | 架构 | 说明 |
+| 安装程序 / 格式 | 适用系统 | 架构 | 说明 |
 | :--- | :--- | :--- | :--- |
-| **`mise-manager-setup-__VERSION__.exe`** | Windows 10 / 11 | `x64` | 官方安装向导（支持自定义安装路径） |
+| **`mise-manager-setup-__VERSION__.exe`** | Windows 10 / 11 | `x64` | **官方标准安装包**（向导式安装，带快捷方式与卸载程序） |
+| **`mise-manager-portable-__VERSION__.exe`** | Windows 10 / 11 | `x64` | **单文件免安装便携版**（双击即用，不写注册表，U 盘即插即用） |
+| **`mise-manager-__VERSION__-win-x64.zip`** | Windows 10 / 11 | `x64` | **绿色免安装压缩包**（解压到任意目录直接运行） |
 
 #### 快速开始：
-1. 下载下方 Assets 中的 **`mise-manager-setup-__VERSION__.exe`**；
-2. 运行安装程序，按提示完成安装并启动；
+1. **安装版用户**：下载 `mise-manager-setup-__VERSION__.exe`，运行向导完成安装；
+2. **便携版用户**：下载 `mise-manager-portable-__VERSION__.exe` 或解压 `.zip` 压缩包，直接双击运行即可；
 3. 首次启动可在首页点击 **“立即安装 mise”** 一键初始化开发环境！
 
 ---
