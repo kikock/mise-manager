@@ -63,7 +63,7 @@ jobs:
 
       - name: Create or Update GitHub Release
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.TOKEN || secrets.GITHUB_TOKEN }}
           RELEASE_TAG: ${{ needs.prepare-version.outputs.tag_name }}
           APP_VERSION: ${{ needs.prepare-version.outputs.version }}
         shell: bash
@@ -108,7 +108,7 @@ jobs:
 
       - name: Build Application (Windows NSIS)
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.TOKEN || secrets.GITHUB_TOKEN }}
         run: yarn build --publish never
 
       - name: Validate Windows Artifacts
@@ -131,7 +131,7 @@ jobs:
 
       - name: Upload Windows Assets to Release
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.TOKEN || secrets.GITHUB_TOKEN }}
           RELEASE_TAG: ${{ needs.prepare-version.outputs.tag_name }}
         shell: pwsh
         run: |

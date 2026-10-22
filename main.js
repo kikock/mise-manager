@@ -1,12 +1,8 @@
 const fs = require('fs');
-fs.appendFileSync('startup.log', `[${new Date().toISOString()}] 1. main.js started, pid: ${process.pid}\n`);
-
 const { app, BrowserWindow, ipcMain, shell } = require('electron');
-const { spawn, exec } = require('child_process');
+const { spawn, exec, execFile } = require('child_process');
 const path = require('path');
 const os = require('os');
-
-fs.appendFileSync('startup.log', `[${new Date().toISOString()}] 2. electron modules imported\n`);
 
 let mainWindow;
 
@@ -149,7 +145,7 @@ function createWindow() {
       webSecurity: false,
     },
     titleBarStyle: 'hidden',
-    show: true, // 立即显示，避免因 ready-to-show 未触发导致隐藏
+    show: false, // 首选隐藏，待渲染就绪后展示，消除白屏顿挫
   });
 
   // Windows 11 视觉优化
@@ -159,10 +155,20 @@ function createWindow() {
 
   mainWindow.loadFile(path.join(__dirname, 'renderer', 'index.html'));
 
-  mainWindow.webContents.on('did-finish-load', () => {
-    mainWindow.show();
-    mainWindow.focus();
-  });
+  let isShown = false;
+  const showSafely = () => {
+    if (mainWindow && !isShown) {
+      isShown = true;
+      mainWindow.show();
+      mainWindow.focus();
+    }
+  };
+
+  // 渲染完成即刻展示
+  mainWindow.once('ready-to-show', showSafely);
+  mainWindow.webContents.once('did-finish-load', showSafely);
+  // 250ms 超时安全兜底
+  setTimeout(showSafely, 250);
 
   mainWindow.webContents.on('did-fail-load', (e, code, desc) => {
     console.error('页面加载失败:', code, desc);
@@ -174,15 +180,13 @@ function createWindow() {
 }
 
 process.on('uncaughtException', (err) => {
-  fs.appendFileSync('startup.log', `[${new Date().toISOString()}] UNCAUGHT EXCEPTION: ${err.stack || err}\n`);
+  console.error('UNCAUGHT EXCEPTION:', err);
 });
 
 app.whenReady().then(() => {
-  fs.appendFileSync('startup.log', `[${new Date().toISOString()}] 3. app.whenReady fired\n`);
   createWindow();
-  fs.appendFileSync('startup.log', `[${new Date().toISOString()}] 4. createWindow completed\n`);
 }).catch(err => {
-  fs.appendFileSync('startup.log', `[${new Date().toISOString()}] whenReady ERROR: ${err.stack || err}\n`);
+  console.error('whenReady ERROR:', err);
 });
 
 app.on('window-all-closed', () => {
@@ -248,56 +252,81 @@ ipcMain.handle('mise:exec', async (event, args) => {
 });
 
 // ─────────────────────────────────────────────
+// ─────────────────────────────────────────────
 // IPC 处理器：检测 mise 是否已安装
 // ─────────────────────────────────────────────
 ipcMain.handle('mise:check', async () => {
   return new Promise((resolve) => {
+    let resolved = false;
+    const finish = (data) => {
+      if (!resolved) {
+        resolved = true;
+        resolve(data);
+      }
+    };
+
+    // 2.5 秒全局安全兜底超时，防止进程卡死
+    const timer = setTimeout(() => {
+      finish({
+        installed: false,
+        version: null,
+        appBaseDir:  getAppBaseDir(),
+        miseRootDir: getMiseRootDir(),
+        miseDataDir: getMiseDataDir(),
+        miseBinDir:  getMiseBinDir(),
+        miseExeDir:  getMiseExeDir(),
+        miseBinPath: getMiseBinPath(),
+      });
+    }, 2500);
+
     const miseExe = getMiseBinPath();
     const env = buildMiseEnv();
-    
-    // 如果本地 bin/mise.exe 已经存在
-    if (fs.existsSync(miseExe)) {
-      exec(`"${miseExe}" --version`, { shell: true, env }, (err, stdout) => {
-        if (!err && stdout.trim()) {
-          resolve({
-            installed: true,
-            version: stdout.trim().replace('mise ', ''),
-            appBaseDir:  getAppBaseDir(),
-            miseRootDir: getMiseRootDir(),
-            miseDataDir: getMiseDataDir(),
-            miseBinDir:  getMiseBinDir(),
-            miseExeDir:  getMiseExeDir(),
-            miseBinPath: miseExe,
-          });
-          return;
-        }
-      });
-      return;
-    }
 
-    // 本地尚未安装，尝试自动从系统已有位置同步一份
+    const testExe = (exePath) => {
+      if (!fs.existsSync(exePath)) return false;
+      try {
+        execFile(exePath, ['--version'], { env, timeout: 1800 }, (err, stdout) => {
+          clearTimeout(timer);
+          if (!err && stdout && stdout.trim()) {
+            finish({
+              installed: true,
+              version: stdout.trim().replace(/^mise\s*/i, ''),
+              appBaseDir:  getAppBaseDir(),
+              miseRootDir: getMiseRootDir(),
+              miseDataDir: getMiseDataDir(),
+              miseBinDir:  getMiseBinDir(),
+              miseExeDir:  getMiseExeDir(),
+              miseBinPath: exePath,
+            });
+          } else {
+            finish({
+              installed: false,
+              version: null,
+              appBaseDir:  getAppBaseDir(),
+              miseRootDir: getMiseRootDir(),
+              miseDataDir: getMiseDataDir(),
+              miseBinDir:  getMiseBinDir(),
+              miseExeDir:  getMiseExeDir(),
+              miseBinPath: exePath,
+            });
+          }
+        });
+        return true;
+      } catch (e) {
+        return false;
+      }
+    };
+
+    // 1. 优先检测主目录下的 mise.exe
+    if (testExe(miseExe)) return;
+
+    // 2. 兜底从系统已知路径克隆一份
     const localExe = ensureLocalMiseExe();
-    if (fs.existsSync(localExe)) {
-      exec(`"${localExe}" --version`, { shell: true, env }, (err, stdout) => {
-        if (!err && stdout.trim()) {
-          resolve({
-            installed: true,
-            version: stdout.trim().replace('mise ', ''),
-            appBaseDir:  getAppBaseDir(),
-            miseRootDir: getMiseRootDir(),
-            miseDataDir: getMiseDataDir(),
-            miseBinDir:  getMiseBinDir(),
-            miseExeDir:  getMiseExeDir(),
-            miseBinPath: localExe,
-          });
-          return;
-        }
-      });
-      return;
-    }
+    if (testExe(localExe)) return;
 
-    // 确实未安装
-    resolve({
+    // 3. 确实未找到
+    clearTimeout(timer);
+    finish({
       installed: false,
       version: null,
       appBaseDir:  getAppBaseDir(),
@@ -314,8 +343,13 @@ ipcMain.handle('mise:check', async () => {
 ipcMain.handle('mise:where', async (event, toolVersion) => {
   return new Promise((resolve) => {
     const miseExe = getMiseBinPath();
-    exec(`"${miseExe}" where ${toolVersion}`, { shell: true, env: buildMiseEnv() }, (err, stdout) => {
-      if (err || !stdout.trim()) {
+    if (!fs.existsSync(miseExe)) {
+      return resolve({ found: false, path: null });
+    }
+    const [tool, ver] = String(toolVersion).split('@');
+    const args = ver ? ['where', `${tool}@${ver}`] : ['where', tool];
+    execFile(miseExe, args, { env: buildMiseEnv(), timeout: 2000 }, (err, stdout) => {
+      if (err || !stdout || !stdout.trim()) {
         resolve({ found: false, path: null });
       } else {
         const p = stdout.trim();
@@ -335,28 +369,16 @@ ipcMain.handle('mise:listInstalled', async () => {
     const dataDir = getMiseDataDir();
     const installsDir = path.join(dataDir, 'installs');
 
-    exec(`"${miseExe}" ls --installed --json`, { shell: true, env, maxBuffer: 10 * 1024 * 1024 }, (err, stdout) => {
-      const toolsMap = {};
-      try {
-        if (stdout && stdout.trim()) {
-          const raw = JSON.parse(stdout.trim());
-          for (const [toolName, versionsList] of Object.entries(raw)) {
-            if (!Array.isArray(versionsList)) continue;
-            toolsMap[toolName] = versionsList.map(v => ({
-              version: v.version,
-              installPath: v.install_path || path.join(installsDir, toolName, v.version),
-              installed: v.installed !== false,
-              active: !!v.active,
-              source: v.source?.path || null,
-              requestedVersion: v.requested_version || null,
-            }));
-          }
-        }
-      } catch (e) {
-        console.error('解析 mise ls JSON 失败:', e);
+    let isDone = false;
+    const finish = (resultList) => {
+      if (!isDone) {
+        isDone = true;
+        resolve({ success: true, tools: resultList, count: resultList.length });
       }
+    };
 
-      // 双重保险：检查物理 installs 目录补充可能漏掉的本地版本
+    // 辅助：从物理目录极速扫描工具与版本
+    const scanPhysicalInstalls = (toolsMap = {}) => {
       if (fs.existsSync(installsDir)) {
         try {
           const toolDirs = fs.readdirSync(installsDir, { withFileTypes: true });
@@ -388,8 +410,7 @@ ipcMain.handle('mise:listInstalled', async () => {
         }
       }
 
-      // 转换为数组并排序，标明当前活跃版本
-      const resultList = Object.keys(toolsMap).sort().map(toolName => {
+      return Object.keys(toolsMap).sort().map(toolName => {
         const versions = toolsMap[toolName];
         const activeVerObj = versions.find(v => v.active);
         return {
@@ -398,8 +419,41 @@ ipcMain.handle('mise:listInstalled', async () => {
           versions: versions.sort((a, b) => b.version.localeCompare(a.version, undefined, { numeric: true })),
         };
       });
+    };
 
-      resolve({ success: true, tools: resultList, count: resultList.length });
+    // 如果 mise.exe 物理文件都不存在，直接快速查物理目录
+    if (!fs.existsSync(miseExe)) {
+      return finish(scanPhysicalInstalls());
+    }
+
+    // 3 秒超时保障，超时后立即降级走物理目录
+    const timer = setTimeout(() => {
+      finish(scanPhysicalInstalls());
+    }, 3000);
+
+    execFile(miseExe, ['ls', '--installed', '--json'], { env, timeout: 2800, maxBuffer: 10 * 1024 * 1024 }, (err, stdout) => {
+      clearTimeout(timer);
+      const toolsMap = {};
+      try {
+        if (!err && stdout && stdout.trim()) {
+          const raw = JSON.parse(stdout.trim());
+          for (const [toolName, versionsList] of Object.entries(raw)) {
+            if (!Array.isArray(versionsList)) continue;
+            toolsMap[toolName] = versionsList.map(v => ({
+              version: v.version,
+              installPath: v.install_path || path.join(installsDir, toolName, v.version),
+              installed: v.installed !== false,
+              active: !!v.active,
+              source: v.source?.path || null,
+              requestedVersion: v.requested_version || null,
+            }));
+          }
+        }
+      } catch (e) {
+        console.error('解析 mise ls JSON 失败:', e);
+      }
+
+      finish(scanPhysicalInstalls(toolsMap));
     });
   });
 });

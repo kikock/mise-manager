@@ -2,8 +2,6 @@
    Fluent Design 系统 CSS 变量体系 — Windows 11 风格
    ============================================================ */
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-
 :root {
   /* ── 颜色令牌 ── */
   --accent:           #0078D4;
