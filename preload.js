@@ -64,4 +64,10 @@ contextBridge.exposeInMainWorld('miseAPI', {
     openExternal: (url) => ipcRenderer.invoke('shell:openExternal', url),
     openPath:     (fullPath) => ipcRenderer.invoke('shell:openPath', fullPath),
   },
+
+  // 应用自身信息与更新
+  app: {
+    getVersion:  () => ipcRenderer.invoke('app:getVersion'),
+    checkUpdate: () => ipcRenderer.invoke('app:checkUpdate'),
+  },
 });

@@ -795,3 +795,92 @@ ipcMain.handle('shell:openPath', async (event, fullPath) => {
   }
   return false;
 });
+
+// ─────────────────────────────────────────────
+// IPC 处理器：应用自身版本与在线更新检测
+// ─────────────────────────────────────────────
+function getAppVersion() {
+  try {
+    const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, 'package.json'), 'utf-8'));
+    return pkg.version || '1.0.0';
+  } catch {
+    return '1.0.0';
+  }
+}
+
+ipcMain.handle('app:getVersion', () => {
+  return {
+    version: getAppVersion(),
+    name: 'Mise Manager',
+    electron: process.versions.electron,
+    node: process.versions.node,
+    platform: process.platform,
+    arch: process.arch,
+  };
+});
+
+ipcMain.handle('app:checkUpdate', async () => {
+  const { net } = require('electron');
+  const currentVersion = getAppVersion();
+  const repo = 'kikock/mise-manager';
+
+  try {
+    const resp = await net.fetch(`https://api.github.com/repos/${repo}/releases/latest`, {
+      headers: { 'User-Agent': 'Mise-Manager-Desktop' }
+    });
+
+    if (resp.status === 404) {
+      return {
+        success: true,
+        hasUpdate: false,
+        currentVersion,
+        latestVersion: currentVersion,
+        message: '当前已是最新版本（GitHub 仓库暂未发布更高 Release）',
+        releasesUrl: `https://github.com/${repo}/releases`
+      };
+    }
+
+    if (!resp.ok) {
+      throw new Error(`GitHub API 响应异常: ${resp.status}`);
+    }
+
+    const data = await resp.json();
+    const tag = (data.tag_name || '').replace(/^v/i, '').trim();
+    const latestVersion = tag || currentVersion;
+
+    const hasUpdate = isNewerVersion(latestVersion, currentVersion);
+
+    return {
+      success: true,
+      hasUpdate,
+      currentVersion,
+      latestVersion,
+      releaseName: data.name || data.tag_name,
+      releaseNotes: data.body || '包含性能改进和稳定性优化。',
+      publishedAt: data.published_at,
+      downloadUrl: data.html_url || `https://github.com/${repo}/releases`,
+      assets: (data.assets || []).map(a => ({
+        name: a.name,
+        size: a.size,
+        downloadUrl: a.browser_download_url
+      }))
+    };
+  } catch (e) {
+    return {
+      success: false,
+      currentVersion,
+      error: e.message,
+      releasesUrl: `https://github.com/${repo}/releases`
+    };
+  }
+});
+
+function isNewerVersion(latest, current) {
+  const parse = v => (v || '').split('.').map(n => parseInt(n, 10) || 0);
+  const [l1, l2, l3] = parse(latest);
+  const [c1, c2, c3] = parse(current);
+  if (l1 > c1) return true;
+  if (l1 === c1 && l2 > c2) return true;
+  if (l1 === c1 && l2 === c2 && l3 > c3) return true;
+  return false;
+}

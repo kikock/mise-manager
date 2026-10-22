@@ -966,10 +966,121 @@ async function loadSettings() {
   // 加载缓存详情
   loadCacheInfo();
 
-  // 读取已保存的代理设置
-  const proxy = localStorage.getItem('mise-proxy') || '';
-  const proxyInput = document.getElementById('input-proxy');
-  if (proxyInput) proxyInput.value = proxy;
+  // 加载应用版本与在线更新信息
+  loadAppVersionInfo();
+}
+
+/** 加载应用自身版本与宿主环境信息 */
+async function loadAppVersionInfo() {
+  try {
+    const info = await window.miseAPI.app.getVersion();
+    const verBadge = document.getElementById('app-current-version-badge');
+    const elVer = document.getElementById('app-electron-ver');
+    const nodeVer = document.getElementById('app-node-ver');
+    const miseCoreVer = document.getElementById('app-mise-core-ver');
+
+    if (verBadge && info.version) verBadge.textContent = `v${info.version}`;
+    if (elVer && info.electron) elVer.textContent = info.electron;
+    if (nodeVer && info.node) nodeVer.textContent = info.node;
+
+    if (AppState.miseVersion && miseCoreVer) {
+      miseCoreVer.textContent = `mise ${AppState.miseVersion}`;
+    } else if (miseCoreVer) {
+      miseCoreVer.textContent = '未就绪';
+    }
+  } catch (e) {
+    console.error('加载版本信息失败:', e);
+  }
+}
+
+/** 检查 Mise Manager 应用在线更新 */
+async function checkAppUpdate() {
+  const btn = document.getElementById('btn-check-app-update');
+  const text = document.getElementById('check-update-text');
+  const statusPill = document.getElementById('update-status-pill');
+  const resultCard = document.getElementById('update-result-card');
+  const resultIcon = document.getElementById('update-result-icon');
+  const resultTitle = document.getElementById('update-result-title');
+  const resultTime = document.getElementById('update-result-time');
+  const resultNotes = document.getElementById('update-result-notes');
+  const resultActions = document.getElementById('update-result-actions');
+
+  if (btn) {
+    btn.classList.add('loading');
+    btn.disabled = true;
+  }
+  if (text) text.textContent = '正在检测 GitHub...';
+
+  try {
+    const res = await window.miseAPI.app.checkUpdate();
+    if (resultCard) resultCard.style.display = 'block';
+    if (resultTime) resultTime.textContent = new Date().toLocaleTimeString();
+
+    if (res.success && res.hasUpdate) {
+      if (statusPill) {
+        statusPill.className = 'badge badge-warning';
+        statusPill.style.background = 'rgba(255, 152, 0, 0.18)';
+        statusPill.style.color = '#ff9800';
+        statusPill.textContent = `发现新版 v${res.latestVersion}`;
+      }
+      if (resultIcon) resultIcon.textContent = '🎉';
+      if (resultTitle) resultTitle.textContent = `发现更高版本可用: v${res.latestVersion} (当前 v${res.currentVersion})`;
+      if (resultNotes) {
+        resultNotes.textContent = `【发布日志】\n${res.releaseNotes || '包含性能改进和稳定性优化。'}`;
+      }
+      if (resultActions) {
+        resultActions.innerHTML = `
+          <button class="btn btn-primary btn-sm" onclick="window.miseAPI.shell.openExternal('${escapeAttr(res.downloadUrl)}')">
+            🚀 前往 GitHub 下载安装包
+          </button>
+          <button class="btn btn-ghost btn-sm" onclick="document.getElementById('update-result-card').style.display='none'">
+            稍后提醒
+          </button>`;
+      }
+      showToast(`检测到新版本 v${res.latestVersion}，可点击前往下载`, 'info', 4000);
+    } else if (res.success && !res.hasUpdate) {
+      if (statusPill) {
+        statusPill.className = 'badge badge-success';
+        statusPill.textContent = '已是最新版';
+      }
+      if (resultIcon) resultIcon.textContent = '✨';
+      if (resultTitle) resultTitle.textContent = '当前已是最新版本';
+      if (resultNotes) {
+        resultNotes.textContent = res.message || `当前版本 v${res.currentVersion} 为官方最新版本，无需更新。`;
+      }
+      if (resultActions) {
+        resultActions.innerHTML = `
+          <button class="btn btn-secondary btn-sm" onclick="document.getElementById('update-result-card').style.display='none'">
+            我知道了
+          </button>`;
+      }
+      showToast('当前已是最新版 Mise Manager ✨', 'success');
+    } else {
+      if (resultIcon) resultIcon.textContent = '⚠️';
+      if (resultTitle) resultTitle.textContent = '未能获取版本信息';
+      if (resultNotes) {
+        resultNotes.textContent = `网络请求失败: ${res.error || '无法连接 GitHub API'}\n如果处于特定网络环境，可在下方配置代理后重试，或直接访问 Releases 页面查看。`;
+      }
+      if (resultActions) {
+        resultActions.innerHTML = `
+          <button class="btn btn-secondary btn-sm" onclick="window.miseAPI.shell.openExternal('https://github.com/kikock/mise-manager/releases')">
+            🌐 打开 Releases 网页
+          </button>
+          <button class="btn btn-ghost btn-sm" onclick="document.getElementById('update-result-card').style.display='none'">
+            关闭
+          </button>`;
+      }
+      showToast('检查更新失败，请检查网络连接', 'error');
+    }
+  } catch (err) {
+    showToast('更新检查异常: ' + err.message, 'error');
+  } finally {
+    if (btn) {
+      btn.classList.remove('loading');
+      btn.disabled = false;
+    }
+    if (text) text.textContent = '检查应用更新';
+  }
 }
 
 /** 检测 Windows 用户环境变量状态 */
@@ -1380,6 +1491,12 @@ function bindEvents() {
     const r = await window.miseAPI.mise.exec(['cache', 'clear']);
     showToast(r.success ? '下载缓存已成功清理' : '清理失败: ' + (r.output || ''), r.success ? 'success' : 'error');
   };
+
+  // 应用版本更新与发行版查看
+  document.getElementById('btn-check-app-update')?.addEventListener('click', checkAppUpdate);
+  document.getElementById('btn-view-releases')?.addEventListener('click', () => {
+    window.miseAPI.shell.openExternal('https://github.com/kikock/mise-manager/releases');
+  });
 
   // 外部链接
   document.getElementById('btn-mise-docs').onclick = () => window.miseAPI.shell.openExternal('https://mise.jdx.dev');

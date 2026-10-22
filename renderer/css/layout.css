@@ -208,17 +208,20 @@
 }
 
 .page-title {
-  font-size: 26px;
+  font-family: var(--font-heading);
+  font-size: 25px;
   font-weight: 700;
   color: var(--text-primary);
-  letter-spacing: -0.02em;
-  line-height: 1.2;
+  letter-spacing: var(--letter-spacing-tight);
+  line-height: 1.25;
 }
 
 .page-subtitle {
   font-size: 13px;
   color: var(--text-secondary);
   margin-top: 6px;
+  line-height: var(--line-height-normal);
+  letter-spacing: var(--letter-spacing-normal);
 }
 
 /* ── 状态条 ── */
