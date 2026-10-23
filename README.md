@@ -13,7 +13,7 @@
 [![UI Style](https://img.shields.io/badge/Design-Fluent%20Design%20System-005FB8)](https://developer.microsoft.com/fluentui)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-[功能特性](#-功能特性) • [快速开始](#-快速开始) • [致谢与灵感](#-致谢与上游开源项目) • [工作原理](#-工作原理与环境变量) • [开源许可](#-开源协议)
+[功能特性](#-功能特性) • [界面预览](#-界面预览) • [快速开始](#-快速开始) • [致谢与灵感](#-致谢与上游开源项目) • [工作原理](#-工作原理与环境变量) • [开源许可](#-开源协议)
 
 </div>
 
@@ -24,6 +24,33 @@
 在现代全栈开发中，开发者往往需要在不同的语言版本（如 Node.js 18/20/22、Python 3.10/3.12、Go、Rust、Java、Yarn 等）之间频繁切换。**mise**（前身为 rtx）凭借 Rust 带来的极致性能，成为了开发环境与版本管理领域的标杆工具。
 
 **Mise Manager** 致力于降低 Windows 开发者使用 mise 的门槛，提供了一个极具现代感、无缝融合 Windows 11 视觉质感的图形化控制台。无需记忆繁杂的 CLI 参数，即可在界面中轻松检索全网工具、一键切换版本、监控系统环境变量与维护本地工具链。
+
+---
+
+## 🖼️ 界面预览
+
+### 1. 主页工作台 (Home Dashboard)
+直观呈现本机 mise 运行时状态、版本就绪指标、数据存放路径与已安装主流开发工具快速概览。
+![主页工作台](docs/screenshots/01-home.png)
+
+### 2. 应用生态市场 (Tool Ecosystem Market)
+实时对接官方 REST API，全量聚合 1000+ 开源工具生态，支持关键词检索、分类探查、多版本选择与一键静默安装。
+![应用生态市场](docs/screenshots/02-market.png)
+
+### 3. 已安装工具精细化管理 (Installed Tools)
+清晰展示已安装语言和运行时的所有物理版本，支持 Global（全局默认）与 Local（项目独立）热切换与物理目录秒级直达。
+![已安装工具管理](docs/screenshots/03-installed.png)
+
+### 4. 路径配置与环境变量托管 (Settings & Environment)
+绿色便携式设计，支持自定义数据目录与 Shims 路径，内置 PowerShell 引擎一键将环境安全写入 Windows 用户环境变量。
+![系统设置与环境变量托管](docs/screenshots/04-settings.png)
+
+### 5. 极速版本发布日志与多主题适配
+内置 GitHub Releases 秒级缓存与更新探查弹窗；原生深度适配 Windows 11 Fluent 深色 / 浅色模式无缝切换。
+
+| 历史版本发行与安装包直达 | Fluent 浅色模式界面 |
+| :---: | :---: |
+| <img src="docs/screenshots/05-releases-modal.png" width="100%" alt="历史发行版本" /> | <img src="docs/screenshots/06-home-light.png" width="100%" alt="浅色模式" /> |
 
 ---
 
@@ -80,6 +107,12 @@
    ```powershell
    yarn build
    # 构建产物将生成在 dist/ 目录下
+   ```
+
+5. **一键生成最新说明文档界面截图**：
+   ```powershell
+   yarn screenshot
+   # 自动化运行并将各页面高保真截图输出至 docs/screenshots/
    ```
 
 ---

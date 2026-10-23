@@ -174,9 +174,77 @@ function createWindow() {
     console.error('页面加载失败:', code, desc);
   });
 
+  if (process.argv.includes('--screenshot')) {
+    mainWindow.webContents.once('did-finish-load', () => {
+      runScreenshotAutomation();
+    });
+  }
+
   mainWindow.on('closed', () => {
     mainWindow = null;
   });
+}
+
+/** 自动化截取软件界面截图并输出到 docs/screenshots/ 目录 */
+async function runScreenshotAutomation() {
+  const screenshotsDir = path.join(__dirname, 'docs', 'screenshots');
+  fs.mkdirSync(screenshotsDir, { recursive: true });
+
+  const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+  console.log('[截图任务] 等待首页渲染及初始数据加载...');
+  await sleep(3500);
+
+  // 1. 首页 (深色)
+  console.log('[截图任务] 截取首页 (深色)...');
+  let image = await mainWindow.webContents.capturePage();
+  fs.writeFileSync(path.join(screenshotsDir, '01-home.png'), image.toPNG());
+
+  // 2. 应用市场
+  console.log('[截图任务] 切换到应用市场...');
+  await mainWindow.webContents.executeJavaScript(`navigateTo('market');`);
+  await sleep(3500);
+  image = await mainWindow.webContents.capturePage();
+  fs.writeFileSync(path.join(screenshotsDir, '02-market.png'), image.toPNG());
+
+  // 3. 已安装工具
+  console.log('[截图任务] 切换到已安装工具列表...');
+  await mainWindow.webContents.executeJavaScript(`navigateTo('installed');`);
+  await sleep(2500);
+  image = await mainWindow.webContents.capturePage();
+  fs.writeFileSync(path.join(screenshotsDir, '03-installed.png'), image.toPNG());
+
+  // 4. 设置页面
+  console.log('[截图任务] 切换到设置面板...');
+  await mainWindow.webContents.executeJavaScript(`navigateTo('settings');`);
+  await sleep(2000);
+  image = await mainWindow.webContents.capturePage();
+  fs.writeFileSync(path.join(screenshotsDir, '04-settings.png'), image.toPNG());
+
+  // 5. 历史版本模态框
+  console.log('[截图任务] 截取历史发行版本对话框...');
+  await mainWindow.webContents.executeJavaScript(`showReleasesModal();`);
+  await sleep(3000);
+  image = await mainWindow.webContents.capturePage();
+  fs.writeFileSync(path.join(screenshotsDir, '05-releases-modal.png'), image.toPNG());
+
+  // 6. 浅色模式首页
+  console.log('[截图任务] 截取浅色模式首页...');
+  await mainWindow.webContents.executeJavaScript(`
+    closeReleasesModal();
+    applyTheme('light');
+    navigateTo('home');
+  `);
+  await sleep(2000);
+  image = await mainWindow.webContents.capturePage();
+  fs.writeFileSync(path.join(screenshotsDir, '06-home-light.png'), image.toPNG());
+
+  // 恢复默认深色
+  await mainWindow.webContents.executeJavaScript(`applyTheme('dark');`);
+  await sleep(500);
+
+  console.log('[截图任务] 截图任务圆满完成！已存入 docs/screenshots/');
+  app.quit();
 }
 
 process.on('uncaughtException', (err) => {
