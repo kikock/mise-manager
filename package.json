@@ -37,6 +37,7 @@
     ],
     "win": {
       "icon": "build/icon.ico",
+      "artifactName": "mise-manager-${version}-win-${arch}.${ext}",
       "target": [
         {
           "target": "nsis",
@@ -69,9 +70,6 @@
     },
     "portable": {
       "artifactName": "mise-manager-portable-${version}.${ext}"
-    },
-    "zip": {
-      "artifactName": "mise-manager-${version}-win-${arch}.${ext}"
     }
   }
 }
