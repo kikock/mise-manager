@@ -320,6 +320,70 @@ ipcMain.handle('mise:exec', async (event, args) => {
 });
 
 // ─────────────────────────────────────────────
+// IPC 处理器：读取与设置 mise 运行设定项 (如 not_found_auto_install)
+// ─────────────────────────────────────────────
+ipcMain.handle('mise:getSettings', async () => {
+  return new Promise((resolve) => {
+    const miseExe = getMiseBinPath();
+    if (!fs.existsSync(miseExe)) {
+      return resolve({ success: false, not_found_auto_install: false, auto_install: true });
+    }
+    execFile(miseExe, ['settings', '--all', '--json'], { env: buildMiseEnv() }, (err, stdout) => {
+      try {
+        const data = JSON.parse(stdout || '{}');
+        resolve({
+          success: true,
+          not_found_auto_install: !!data.not_found_auto_install,
+          auto_install: data.auto_install !== false,
+          exec_auto_install: data.exec_auto_install !== false,
+        });
+      } catch {
+        resolve({ success: false, not_found_auto_install: false, auto_install: true });
+      }
+    });
+  });
+});
+
+ipcMain.handle('mise:setSetting', async (event, { key, value }) => {
+  return new Promise((resolve) => {
+    const miseExe = getMiseBinPath();
+    if (!fs.existsSync(miseExe)) {
+      return resolve({ success: false, error: 'mise.exe 不存在' });
+    }
+    execFile(miseExe, ['settings', 'set', key, String(value)], { env: buildMiseEnv() }, (err, stdout, stderr) => {
+      if (err) {
+        resolve({ success: false, error: stderr || err.message });
+      } else {
+        resolve({ success: true, output: (stdout || '').trim() });
+      }
+    });
+  });
+});
+
+// 一键全量安装/补齐所有声明的工具 (mise install)
+ipcMain.handle('mise:installAll', async () => {
+  return new Promise((resolve) => {
+    const miseExe = getMiseBinPath();
+    const env = buildMiseEnv();
+    const proc = spawn(miseExe, ['install', '-y'], {
+      shell: true,
+      env,
+    });
+    let output = '';
+    proc.stdout.on('data', (d) => {
+      output += d.toString();
+      if (mainWindow) mainWindow.webContents.send('mise:stream', d.toString());
+    });
+    proc.stderr.on('data', (d) => {
+      output += d.toString();
+      if (mainWindow) mainWindow.webContents.send('mise:stream', d.toString());
+    });
+    proc.on('close', (code) => {
+      resolve({ success: code === 0, output });
+    });
+  });
+});
+
 // ─────────────────────────────────────────────
 // IPC 处理器：检测 mise 是否已安装
 // ─────────────────────────────────────────────
@@ -794,6 +858,120 @@ ipcMain.handle('env:remove', async () => {
     return { success: false, error: res.error };
   }
 });
+
+// ─────────────────────────────────────────────
+// IPC 处理器：检测 PowerShell Profile 激活状态 (PowerShell 5.1 & PowerShell 7)
+// ─────────────────────────────────────────────
+ipcMain.handle('env:getPwshProfileStatus', async () => {
+  const script = [
+    '$doc = [Environment]::GetFolderPath("MyDocuments")',
+    '$ps51 = Join-Path $doc "WindowsPowerShell\\Microsoft.PowerShell_profile.ps1"',
+    '$ps7  = Join-Path $doc "PowerShell\\Microsoft.PowerShell_profile.ps1"',
+    'function Check-Profile($p) {',
+    '  if (Test-Path $p) {',
+    '    $txt = Get-Content $p -Raw -ErrorAction SilentlyContinue',
+    '    return [bool]($txt -match "mise\\s+activate")',
+    '  }',
+    '  return $false',
+    '}',
+    '[PSCustomObject]@{',
+    '  ps51Path = $ps51',
+    '  ps51Exists = (Test-Path $ps51)',
+    '  ps51Activated = (Check-Profile $ps51)',
+    '  ps7Path = $ps7',
+    '  ps7Exists = (Test-Path $ps7)',
+    '  ps7Activated = (Check-Profile $ps7)',
+    '} | ConvertTo-Json',
+  ].join('\n');
+
+  const res = await runPowerShellScript(script);
+  if (res.success) {
+    try {
+      const data = JSON.parse(res.output);
+      return { success: true, ...data };
+    } catch {
+      return { success: false, error: '解析返回数据失败' };
+    }
+  } else {
+    return { success: false, error: res.error };
+  }
+});
+
+// ─────────────────────────────────────────────
+// IPC 处理器：一键激活 PowerShell Profile (支持 PS 5.1 & PS 7，并自动注入告警抑制)
+// ─────────────────────────────────────────────
+ipcMain.handle('env:applyPwshProfile', async () => {
+  const script = [
+    '$doc = [Environment]::GetFolderPath("MyDocuments")',
+    '$paths = @(',
+    '  (Join-Path $doc "WindowsPowerShell\\Microsoft.PowerShell_profile.ps1"),',
+    '  (Join-Path $doc "PowerShell\\Microsoft.PowerShell_profile.ps1")',
+    ')',
+    '$block = @(',
+    '  "# >>> mise initialize >>>",',
+    '  "`$env:MISE_PWSH_CHPWD_WARNING = \'0\'",',
+    '  "if (Get-Command mise -ErrorAction SilentlyContinue) {",',
+    '  "    mise activate pwsh | Out-String | Invoke-Expression",',
+    '  "}",',
+    '  "# <<< mise initialize <<<"',
+    ') -join [Environment]::NewLine',
+    'foreach ($p in $paths) {',
+    '  $dir = Split-Path $p',
+    '  if (-not (Test-Path $dir)) {',
+    '    New-Item -ItemType Directory -Path $dir -Force | Out-Null',
+    '  }',
+    '  $content = ""',
+    '  if (Test-Path $p) {',
+    '    $content = Get-Content $p -Raw -ErrorAction SilentlyContinue',
+    '  }',
+    '  if (-not $content) { $content = "" }',
+    '  $content = $content -replace "(?ms)# >>> mise initialize >>>.*?# <<< mise initialize <<<\\r?\\n?", ""',
+    '  $content = $content -replace "(?m)^\\s*\\$env:MISE_PWSH_CHPWD_WARNING\\s*=.*$\\r?\\n?", ""',
+    '  $content = $content -replace "(?m)^\\s*mise\\s+activate\\s+pwsh.*$\\r?\\n?", ""',
+    '  $content = $content.Trim()',
+    '  if ($content) {',
+    '    $newContent = $content + [Environment]::NewLine + [Environment]::NewLine + $block + [Environment]::NewLine',
+    '  } else {',
+    '    $newContent = $block + [Environment]::NewLine',
+    '  }',
+    '  [System.IO.File]::WriteAllText($p, $newContent, [System.Text.Encoding]::UTF8)',
+    '}',
+    'Write-Output "OK"',
+  ].join('\n');
+
+  const res = await runPowerShellScript(script);
+  return { success: res.success && res.output === 'OK', error: res.error };
+});
+
+// ─────────────────────────────────────────────
+// IPC 处理器：一键从 PowerShell Profile 中清除 mise 激活脚本
+// ─────────────────────────────────────────────
+ipcMain.handle('env:removePwshProfile', async () => {
+  const script = [
+    '$doc = [Environment]::GetFolderPath("MyDocuments")',
+    '$paths = @(',
+    '  (Join-Path $doc "WindowsPowerShell\\Microsoft.PowerShell_profile.ps1"),',
+    '  (Join-Path $doc "PowerShell\\Microsoft.PowerShell_profile.ps1")',
+    ')',
+    'foreach ($p in $paths) {',
+    '  if (Test-Path $p) {',
+    '    $content = Get-Content $p -Raw -ErrorAction SilentlyContinue',
+    '    if ($content) {',
+    '      $content = $content -replace "(?ms)# >>> mise initialize >>>.*?# <<< mise initialize <<<\\r?\\n?", ""',
+    '      $content = $content -replace "(?m)^\\s*\\$env:MISE_PWSH_CHPWD_WARNING\\s*=.*$\\r?\\n?", ""',
+    '      $content = $content -replace "(?m)^\\s*mise\\s+activate\\s+pwsh.*$\\r?\\n?", ""',
+    '      $content = $content.Trim()',
+    '      [System.IO.File]::WriteAllText($p, $content, [System.Text.Encoding]::UTF8)',
+    '    }',
+    '  }',
+    '}',
+    'Write-Output "OK"',
+  ].join('\n');
+
+  const res = await runPowerShellScript(script);
+  return { success: res.success && res.output === 'OK', error: res.error };
+});
+
 
 // ─────────────────────────────────────────────
 // IPC 处理器：从官方 REST API 获取工具列表（支持分页全量拉取）

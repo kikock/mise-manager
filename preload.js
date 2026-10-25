@@ -17,7 +17,10 @@ contextBridge.exposeInMainWorld('miseAPI', {
     use:           (tool, version, isGlobal, cwd) => ipcRenderer.invoke('mise:use', { tool, version, isGlobal, cwd }),
     exec:          (args) => ipcRenderer.invoke('mise:exec', args),
     install:       (options) => ipcRenderer.invoke('mise:install', options),
+    installAll:    () => ipcRenderer.invoke('mise:installAll'),
     uninstall:     () => ipcRenderer.invoke('mise:uninstall'),
+    getSettings:   () => ipcRenderer.invoke('mise:getSettings'),
+    setSetting:    (key, value) => ipcRenderer.invoke('mise:setSetting', { key, value }),
     onStream: (callback) => {
       ipcRenderer.on('mise:stream', (event, data) => callback(data));
     },
@@ -26,11 +29,14 @@ contextBridge.exposeInMainWorld('miseAPI', {
     },
   },
 
-  // Windows 环境变量管理
+  // Windows 环境变量管理与终端激活
   env: {
-    get:    () => ipcRenderer.invoke('env:get'),
-    apply:  () => ipcRenderer.invoke('env:apply'),
-    remove: () => ipcRenderer.invoke('env:remove'),
+    get:                  () => ipcRenderer.invoke('env:get'),
+    apply:                () => ipcRenderer.invoke('env:apply'),
+    remove:               () => ipcRenderer.invoke('env:remove'),
+    getPwshProfileStatus: () => ipcRenderer.invoke('env:getPwshProfileStatus'),
+    applyPwshProfile:     () => ipcRenderer.invoke('env:applyPwshProfile'),
+    removePwshProfile:    () => ipcRenderer.invoke('env:removePwshProfile'),
   },
 
   // 应用市场（官方 REST API + 本地缓存）

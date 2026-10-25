@@ -105,6 +105,22 @@
               <div style="color:var(--text-tertiary);margin-bottom:4px;font-size:10px;">预定安装目录 (MISE_DATA_DIR)</div>
               <div id="install-dir-preview" style="color:var(--accent);word-break:break-all">-</div>
             </div>
+
+            <!-- 首次安装自动激活选项 -->
+            <div style="background:rgba(255,255,255,0.03);border-radius:8px;padding:10px 12px;margin-bottom:14px;border:1px solid rgba(255,255,255,0.06);font-size:12px">
+              <div style="font-weight:600;margin-bottom:8px;color:var(--text-primary);display:flex;align-items:center;gap:6px">
+                <span>⚡ 首次安装自动激活终端：</span>
+              </div>
+              <label style="display:flex;align-items:center;gap:8px;margin-bottom:6px;cursor:pointer;color:var(--text-secondary)">
+                <input type="checkbox" id="chk-auto-apply-env" checked />
+                <span>自动写入用户环境变量（激活 CMD / 通用终端 Shims）</span>
+              </label>
+              <label style="display:flex;align-items:center;gap:8px;cursor:pointer;color:var(--text-secondary)">
+                <input type="checkbox" id="chk-auto-activate-pwsh" checked />
+                <span>自动激活 PowerShell（写入 Profile 脚本，并内置屏蔽 5.1 兼容警告）</span>
+              </label>
+            </div>
+
             <div class="flex gap-8">
               <button class="btn btn-primary" id="btn-install-mise">🚀 立即安装 mise</button>
               <button class="btn btn-ghost btn-sm" id="btn-change-install-dir">📂 自定义路径</button>
@@ -369,50 +385,52 @@
             <button class="btn btn-ghost btn-sm" id="btn-refresh-env">🔄 刷新环境变量检测</button>
           </div>
 
-          <div style="margin-bottom:16px;background:rgba(0,0,0,0.2);border-radius:8px;padding:12px;border:1px solid rgba(255,255,255,0.06)">
-            <!-- 表头 -->
-            <div style="display:grid;grid-template-columns:180px 1fr 140px 140px;gap:8px;padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,0.08);font-size:11.5px;color:var(--text-tertiary);font-weight:600">
-              <div>配置项 / 作用</div>
-              <div>目标物理路径 (统一目录)</div>
-              <div>独立变量状态</div>
-              <div>用户 Path 状态</div>
-            </div>
-
-            <!-- 条目 1: mise 实际入口目录 -->
-            <div style="display:grid;grid-template-columns:180px 1fr 140px 140px;gap:8px;align-items:center;padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.04);font-size:12px">
-              <div>
-                <b style="color:var(--text-primary)">1. mise 入口所在目录</b>
-                <div style="font-size:10.5px;color:var(--text-tertiary)">包含 mise.exe 核心程序</div>
+          <div style="margin-bottom:16px;background:rgba(0,0,0,0.2);border-radius:8px;padding:12px;border:1px solid rgba(255,255,255,0.06);overflow-x:auto">
+            <div style="min-width:660px">
+              <!-- 表头 -->
+              <div style="display:grid;grid-template-columns:180px 1fr 140px 140px;gap:8px;padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,0.08);font-size:11.5px;color:var(--text-tertiary);font-weight:600">
+                <div>配置项 / 作用</div>
+                <div>目标物理路径 (统一目录)</div>
+                <div>独立变量状态</div>
+                <div>用户 Path 状态</div>
               </div>
-              <div id="env-val-exe-dir" style="font-family:var(--font-mono);font-size:11.5px;color:#81c784;word-break:break-all">-</div>
-              <div><span class="badge badge-neutral" style="font-size:10.5px">- (通过 Path 调用)</span></div>
-              <div id="env-status-path-exe"><span class="badge badge-neutral">检测中...</span></div>
-            </div>
 
-            <!-- 条目 2: MISE_BIN_DIR (shims 目录) -->
-            <div style="display:grid;grid-template-columns:180px 1fr 140px 140px;gap:8px;align-items:center;padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.04);font-size:12px">
-              <div>
-                <b style="color:var(--text-primary)">2. MISE_BIN_DIR</b>
-                <div style="font-size:10.5px;color:var(--text-tertiary)">shims 垫片执行目录</div>
+              <!-- 条目 1: mise 实际入口目录 -->
+              <div style="display:grid;grid-template-columns:180px 1fr 140px 140px;gap:8px;align-items:center;padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.04);font-size:12px">
+                <div>
+                  <b style="color:var(--text-primary)">1. mise 入口所在目录</b>
+                  <div style="font-size:10.5px;color:var(--text-tertiary)">包含 mise.exe 核心程序</div>
+                </div>
+                <div id="env-val-exe-dir" style="font-family:var(--font-mono);font-size:11.5px;color:#81c784;word-break:break-all">-</div>
+                <div><span class="badge badge-neutral" style="font-size:10.5px">- (通过 Path 调用)</span></div>
+                <div id="env-status-path-exe"><span class="badge badge-neutral">检测中...</span></div>
               </div>
-              <div id="env-val-bin-dir" style="font-family:var(--font-mono);font-size:11.5px;color:#ce93d8;word-break:break-all">-</div>
-              <div id="env-status-var-bin"><span class="badge badge-neutral">检测中...</span></div>
-              <div id="env-status-path-bin"><span class="badge badge-neutral">检测中...</span></div>
-            </div>
 
-            <!-- 条目 3: MISE_DATA_DIR (数据目录) -->
-            <div style="display:grid;grid-template-columns:180px 1fr 140px 140px;gap:8px;align-items:center;padding:10px 0;font-size:12px">
-              <div>
-                <b style="color:var(--text-primary)">3. MISE_DATA_DIR</b>
-                <div style="font-size:10.5px;color:var(--text-tertiary)">工具安装与下载主数据</div>
+              <!-- 条目 2: MISE_BIN_DIR (shims 目录) -->
+              <div style="display:grid;grid-template-columns:180px 1fr 140px 140px;gap:8px;align-items:center;padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.04);font-size:12px">
+                <div>
+                  <b style="color:var(--text-primary)">2. MISE_BIN_DIR</b>
+                  <div style="font-size:10.5px;color:var(--text-tertiary)">shims 垫片执行目录</div>
+                </div>
+                <div id="env-val-bin-dir" style="font-family:var(--font-mono);font-size:11.5px;color:#ce93d8;word-break:break-all">-</div>
+                <div id="env-status-var-bin"><span class="badge badge-neutral">检测中...</span></div>
+                <div id="env-status-path-bin"><span class="badge badge-neutral">检测中...</span></div>
               </div>
-              <div id="env-val-data-dir" style="font-family:var(--font-mono);font-size:11.5px;color:#4fc3f7;word-break:break-all">-</div>
-              <div id="env-status-var-data"><span class="badge badge-neutral">检测中...</span></div>
-              <div id="env-status-path-data"><span class="badge badge-neutral">检测中...</span></div>
+
+              <!-- 条目 3: MISE_DATA_DIR (数据目录) -->
+              <div style="display:grid;grid-template-columns:180px 1fr 140px 140px;gap:8px;align-items:center;padding:10px 0;font-size:12px">
+                <div>
+                  <b style="color:var(--text-primary)">3. MISE_DATA_DIR</b>
+                  <div style="font-size:10.5px;color:var(--text-tertiary)">工具安装与下载主数据</div>
+                </div>
+                <div id="env-val-data-dir" style="font-family:var(--font-mono);font-size:11.5px;color:#4fc3f7;word-break:break-all">-</div>
+                <div id="env-status-var-data"><span class="badge badge-neutral">检测中...</span></div>
+                <div id="env-status-path-data"><span class="badge badge-neutral">检测中...</span></div>
+              </div>
             </div>
           </div>
 
-          <div class="flex gap-8" style="align-items:center">
+          <div class="flex gap-8" style="align-items:center;flex-wrap:wrap">
             <button class="btn btn-primary btn-sm" id="btn-apply-env">⚡ 一键同步写入 Windows 环境变量</button>
             <button class="btn btn-ghost btn-sm" id="btn-remove-env" style="color:var(--danger)">🗑️ 从环境变量中一键清除</button>
             <span style="font-size:11.5px;color:var(--text-tertiary);margin-left:auto">
@@ -420,6 +438,106 @@
             </span>
           </div>
         </div>
+
+        <!-- ══════════════════ 终端与 Shims 激活管理 (CMD / PowerShell) ══════════════════ -->
+        <div class="card mb-16">
+          <div class="card-header">
+            <div>
+              <div class="card-title">🐚 终端与 Shims 激活管理 (CMD / PowerShell)</div>
+              <div class="card-subtitle">控制不同终端的激活模式：CMD 采用 Shims 垫片机制，PowerShell 采用动态 Hook 机制</div>
+            </div>
+            <button class="btn btn-ghost btn-sm" id="btn-refresh-activation">🔄 刷新激活状态</button>
+          </div>
+
+          <div class="grid-2 gap-12" style="margin-bottom:0">
+            <!-- CMD / 通用终端激活卡片 -->
+            <div style="background:rgba(0,0,0,0.2);border-radius:8px;padding:14px;border:1px solid rgba(255,255,255,0.06);display:flex;flex-direction:column;justify-content:space-between">
+              <div>
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+                  <span style="font-weight:600;font-size:13px;color:var(--text-primary)">💻 CMD / 通用终端 (Shims 垫片)</span>
+                  <span id="badge-cmd-activation"><span class="badge badge-neutral">检测中...</span></span>
+                </div>
+                <p style="font-size:11.5px;color:var(--text-secondary);line-height:1.55;margin-bottom:12px">
+                  通过在 Windows 用户 Path 中注册 <code style="color:#ce93d8">data\shims</code> 垫片目录，使 CMD、Git Bash 及各类 IDE 终端能直接调用已激活的全局工具版本。
+                </p>
+              </div>
+              <div class="flex gap-8" style="flex-wrap:wrap">
+                <button class="btn btn-primary btn-sm" id="btn-activate-cmd">⚡ 同步 Shims 环境变量</button>
+              </div>
+            </div>
+
+            <!-- PowerShell 动态激活卡片 -->
+            <div style="background:rgba(0,0,0,0.2);border-radius:8px;padding:14px;border:1px solid rgba(255,255,255,0.06);display:flex;flex-direction:column;justify-content:space-between">
+              <div>
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+                  <span style="font-weight:600;font-size:13px;color:var(--text-primary)">⚡ PowerShell 动态 Hook</span>
+                  <span id="badge-pwsh-activation"><span class="badge badge-neutral">检测中...</span></span>
+                </div>
+                <p style="font-size:11.5px;color:var(--text-secondary);line-height:1.55;margin-bottom:8px">
+                  写入 PowerShell 配置文件（<code style="color:var(--text-tertiary)">$PROFILE</code>），支持跨项目目录自动切换版本环境。
+                </p>
+                <div id="pwsh-profile-details" style="font-size:11px;color:var(--text-tertiary);font-family:var(--font-mono);line-height:1.65;margin-bottom:12px;background:rgba(0,0,0,0.15);padding:8px 10px;border-radius:6px">
+                  <div>• Windows PowerShell 5.1: <span id="txt-ps51-status">-</span></div>
+                  <div>• PowerShell 7+: <span id="txt-ps7-status">-</span></div>
+                  <div style="color:#81c784;margin-top:2px">💡 内置自动抑制 5.1 兼容告警 ($env:MISE_PWSH_CHPWD_WARNING=0)</div>
+                </div>
+              </div>
+              <div class="flex gap-8" style="flex-wrap:wrap">
+                <button class="btn btn-primary btn-sm" id="btn-apply-pwsh-profile">⚡ 一键激活 PowerShell</button>
+                <button class="btn btn-ghost btn-sm" id="btn-remove-pwsh-profile" style="color:var(--danger)">🗑️ 清除激活</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ══════════════════ 运行时行为与自动安装配置 ══════════════════ -->
+        <div class="card mb-16">
+          <div class="card-header">
+            <div>
+              <div class="card-title">🛠️ 运行时行为与自动安装配置</div>
+              <div class="card-subtitle">控制终端在敲击工具命令时，若发现未下载或版本缺失，是否先自动拉取安装</div>
+            </div>
+            <button class="btn btn-ghost btn-sm" id="btn-refresh-mise-settings">🔄 刷新设定</button>
+          </div>
+
+          <div style="background:rgba(0,0,0,0.2);border-radius:8px;padding:14px;border:1px solid rgba(255,255,255,0.06);margin-bottom:14px">
+            <!-- 设定 1: not_found_auto_install -->
+            <label style="display:flex;align-items:flex-start;gap:12px;cursor:pointer;padding-bottom:12px;border-bottom:1px solid rgba(255,255,255,0.05);margin-bottom:12px">
+              <input type="checkbox" id="chk-not-found-auto-install" style="margin-top:3px;flex-shrink:0" />
+              <div>
+                <div style="font-weight:600;font-size:12.5px;color:var(--text-primary)">
+                  执行未安装工具时自动下载安装 (<code style="color:#81c784">not_found_auto_install</code>)
+                </div>
+                <div style="font-size:11.5px;color:var(--text-secondary);line-height:1.55;margin-top:4px">
+                  在 CMD 或 PowerShell 终端中执行 <code style="color:#ce93d8">java</code>、<code style="color:#ce93d8">node</code> 等命令时，如果本地尚不存在该版本，mise 将拦截并在终端先自动静默/进度条下载安装，安装完毕后直接继续执行原命令。
+                </div>
+              </div>
+            </label>
+
+            <!-- 设定 2: auto_install -->
+            <label style="display:flex;align-items:flex-start;gap:12px;cursor:pointer">
+              <input type="checkbox" id="chk-auto-install" style="margin-top:3px;flex-shrink:0" />
+              <div>
+                <div style="font-weight:600;font-size:12.5px;color:var(--text-primary)">
+                  环境变更时自动补齐缺失依赖 (<code style="color:#81c784">auto_install</code>)
+                </div>
+                <div style="font-size:11.5px;color:var(--text-secondary);line-height:1.55;margin-top:4px">
+                  进入包含 <code style="color:var(--text-tertiary)">.mise.toml</code> 的项目目录或执行任务时，若发现配置的工具缺失，自动拉取补齐。
+                </div>
+              </div>
+            </label>
+          </div>
+
+          <div class="flex gap-8" style="align-items:center;flex-wrap:wrap">
+            <button class="btn btn-secondary btn-sm" id="btn-install-missing-tools">📦 一键扫描并补齐所有已声明工具 (mise install)</button>
+            <span style="font-size:11.5px;color:var(--text-tertiary);margin-left:auto">
+              💡 更改开关后立即自动同步到 <code style="color:var(--text-secondary)">~/.config/mise/config.toml</code>
+            </span>
+          </div>
+        </div>
+
+
+
 
         <div class="grid-2">
           <!-- 市场缓存卡片 -->

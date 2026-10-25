@@ -568,11 +568,21 @@
 }
 
 /* ─────────────────────
-   网格辅助
+   网格辅助与响应式排版
 ───────────────────── */
-.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-.grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
-.grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+.grid-2 { 
+  display: grid; 
+  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); 
+  gap: 16px; 
+}
+.grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+.grid-4 { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; }
+
+@media (max-width: 860px) {
+  .grid-2 {
+    grid-template-columns: 1fr;
+  }
+}
 
 .flex { display: flex; }
 .flex-center { display: flex; align-items: center; justify-content: center; }

@@ -593,8 +593,41 @@ async function installMise() {
   btn.textContent = '🚀 立即安装 mise';
 
   if (result.success) {
-    showToast('mise 安装成功！', 'success');
+    // 首次安装自动激活处理
+    const autoApplyEnv = document.getElementById('chk-auto-apply-env')?.checked ?? true;
+    const autoActivatePwsh = document.getElementById('chk-auto-activate-pwsh')?.checked ?? true;
+
+    if (autoApplyEnv) {
+      appendTerminal(termOut, '\r\n⏳ 正在自动配置 Windows 环境变量与 Shims 垫片...\r\n');
+      try {
+        const envRes = await window.miseAPI.env.apply();
+        if (envRes && envRes.success) {
+          appendTerminal(termOut, '✅ 已自动激活 CMD 与通用终端环境变量 (MISE_BIN_DIR / Shims已写入用户Path)\r\n');
+        } else {
+          appendTerminal(termOut, `⚠️ 自动配置环境变量提示: ${envRes?.error || '写入失败'}\r\n`);
+        }
+      } catch (e) {
+        appendTerminal(termOut, `⚠️ 自动配置环境变量异常: ${e.message}\r\n`);
+      }
+    }
+
+    if (autoActivatePwsh) {
+      appendTerminal(termOut, '⏳ 正在自动配置 PowerShell Profile 激活脚本...\r\n');
+      try {
+        const pwshRes = await window.miseAPI.env.applyPwshProfile();
+        if (pwshRes && pwshRes.success) {
+          appendTerminal(termOut, '✅ 已自动激活 PowerShell 终端 (已写入 Profile 并智能处理兼容警告)\r\n');
+        } else {
+          appendTerminal(termOut, `⚠️ 自动配置 PowerShell Profile 提示: ${pwshRes?.error || '写入失败'}\r\n`);
+        }
+      } catch (e) {
+        appendTerminal(termOut, `⚠️ 自动配置 PowerShell Profile 异常: ${e.message}\r\n`);
+      }
+    }
+
+    showToast('mise 安装成功！已完成自动激活配置。', 'success');
     await checkMiseStatus();
+    await checkEnvStatus();
   } else {
     showToast('安装未完成，请检查网络或终端输出日志', 'error');
   }
@@ -1546,8 +1579,63 @@ async function checkEnvStatus() {
         ? '<span class="badge badge-success">✅ 已在 Path 中</span>'
         : '<span class="badge badge-warning">⚠️ 未在 Path 中</span>';
     }
+
+    // 同步检测终端与 Shims 激活状态
+    await checkActivationStatus();
+
+    // 同步读取 mise 运行时自动安装设定
+    await loadMiseSettings();
   } catch (e) {
     console.error('获取环境变量失败:', e);
+  }
+}
+
+/** 检测终端与 Shims 激活状态 (CMD & PowerShell) */
+async function checkActivationStatus() {
+  const badgeCmd = document.getElementById('badge-cmd-activation');
+  const badgePwsh = document.getElementById('badge-pwsh-activation');
+  const txtPs51 = document.getElementById('txt-ps51-status');
+  const txtPs7 = document.getElementById('txt-ps7-status');
+
+  try {
+    const [env, pwsh] = await Promise.all([
+      window.miseAPI.env.get().catch(() => null),
+      window.miseAPI.env.getPwshProfileStatus().catch(() => null),
+    ]);
+
+    // 1. CMD / 通用终端 Shims 垫片状态
+    if (badgeCmd) {
+      if (env && env.pathHasBinDir) {
+        badgeCmd.innerHTML = '<span class="badge badge-success">✅ 已激活 (Shims 已在 Path)</span>';
+      } else {
+        badgeCmd.innerHTML = '<span class="badge badge-warning">⚠️ 未激活 (未加入 Path)</span>';
+      }
+    }
+
+    // 2. PowerShell Profile 状态
+    if (pwsh && pwsh.success) {
+      if (txtPs51) {
+        txtPs51.innerHTML = pwsh.ps51Activated
+          ? '<span style="color:#81c784;font-weight:600">✅ 已激活</span>'
+          : (pwsh.ps51Exists ? '<span style="color:#ffb74d">⚠️ 未激活</span>' : '<span style="color:var(--text-tertiary)">⚪ 未创建</span>');
+      }
+      if (txtPs7) {
+        txtPs7.innerHTML = pwsh.ps7Activated
+          ? '<span style="color:#81c784;font-weight:600">✅ 已激活</span>'
+          : (pwsh.ps7Exists ? '<span style="color:#ffb74d">⚠️ 未激活</span>' : '<span style="color:var(--text-tertiary)">⚪ 未创建</span>');
+      }
+      if (badgePwsh) {
+        if (pwsh.ps51Activated || pwsh.ps7Activated) {
+          badgePwsh.innerHTML = '<span class="badge badge-success">✅ 已激活 (Hook 已注入)</span>';
+        } else {
+          badgePwsh.innerHTML = '<span class="badge badge-warning">⚠️ 未激活</span>';
+        }
+      }
+    } else if (badgePwsh) {
+      badgePwsh.innerHTML = '<span class="badge badge-neutral">检测失败</span>';
+    }
+  } catch (err) {
+    console.error('检测终端激活状态异常:', err);
   }
 }
 
@@ -1599,6 +1687,102 @@ async function removeEnvSettings() {
     showToast('执行异常: ' + err.message, 'error');
   } finally {
     if (btn) btn.disabled = false;
+  }
+}
+
+/** 一键写入激活脚本到 PowerShell Profile */
+async function applyPwshProfileSettings() {
+  const btn = document.getElementById('btn-apply-pwsh-profile');
+  const oldText = btn ? btn.innerHTML : '';
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '⏳ 正在写入 Profile...';
+  }
+
+  try {
+    const res = await window.miseAPI.env.applyPwshProfile();
+    if (res && res.success) {
+      showToast('⚡ PowerShell Profile 激活脚本已写入完成！（已自动屏蔽 5.1 告警）', 'success', 4500);
+      await checkActivationStatus();
+    } else {
+      showToast('写入失败: ' + (res?.error || '未知错误'), 'error');
+    }
+  } catch (err) {
+    showToast('执行异常: ' + err.message, 'error');
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = oldText;
+    }
+  }
+}
+
+/** 从 PowerShell Profile 中移除激活脚本 */
+async function removePwshProfileSettings() {
+  if (!confirm('确定要从 PowerShell Profile 中移除 mise 激活配置吗？')) {
+    return;
+  }
+  const btn = document.getElementById('btn-remove-pwsh-profile');
+  if (btn) btn.disabled = true;
+
+  try {
+    const res = await window.miseAPI.env.removePwshProfile();
+    if (res && res.success) {
+      showToast('🗑️ 已成功从 PowerShell Profile 中移除激活脚本！', 'info');
+      await checkActivationStatus();
+    } else {
+      showToast('移除失败: ' + (res?.error || '未知错误'), 'error');
+    }
+  } catch (err) {
+    showToast('执行异常: ' + err.message, 'error');
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+/** 读取并同步 mise 运行时自动安装设置 */
+async function loadMiseSettings() {
+  const chkNotFound = document.getElementById('chk-not-found-auto-install');
+  const chkAuto = document.getElementById('chk-auto-install');
+  if (!chkNotFound || !chkAuto) return;
+
+  try {
+    const res = await window.miseAPI.mise.getSettings();
+    if (res && res.success) {
+      chkNotFound.checked = !!res.not_found_auto_install;
+      chkAuto.checked = res.auto_install !== false;
+    }
+  } catch (e) {
+    console.error('获取 mise 运行时设定失败:', e);
+  }
+}
+
+/** 一键扫描并全量补齐所有已声明工具 */
+async function installMissingTools() {
+  const btn = document.getElementById('btn-install-missing-tools');
+  const oldText = btn ? btn.innerHTML : '';
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '⏳ 正在补齐工具...';
+  }
+
+  showToast('开始扫描并补齐所有已声明工具，请稍候...', 'info', 3000);
+  try {
+    const res = await window.miseAPI.mise.installAll();
+    if (res && res.success) {
+      showToast('🎉 所有已声明工具已成功补齐安装就绪！', 'success', 4500);
+      await loadInstalledTools();
+      await checkMiseStatus();
+    } else {
+      showToast('补齐未完全成功，请检查网络或日志输出', 'error');
+    }
+  } catch (err) {
+    showToast('执行异常: ' + err.message, 'error');
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = oldText;
+    }
   }
 }
 
@@ -1818,6 +2002,30 @@ function bindEvents() {
   });
   document.getElementById('btn-apply-env')?.addEventListener('click', applyEnvSettings);
   document.getElementById('btn-remove-env')?.addEventListener('click', removeEnvSettings);
+
+  // 终端与 Shims 激活管理按钮
+  document.getElementById('btn-refresh-activation')?.addEventListener('click', async () => {
+    await checkActivationStatus();
+    showToast('终端激活状态已刷新', 'info');
+  });
+  document.getElementById('btn-activate-cmd')?.addEventListener('click', applyEnvSettings);
+  document.getElementById('btn-apply-pwsh-profile')?.addEventListener('click', applyPwshProfileSettings);
+  document.getElementById('btn-remove-pwsh-profile')?.addEventListener('click', removePwshProfileSettings);
+
+  // 运行时自动安装设定与补齐工具
+  document.getElementById('chk-not-found-auto-install')?.addEventListener('change', async function() {
+    await window.miseAPI.mise.setSetting('not_found_auto_install', this.checked);
+    showToast(this.checked ? '⚡ 已开启：终端执行未安装命令将自动拉取安装' : '已关闭终端执行自动安装', 'info');
+  });
+  document.getElementById('chk-auto-install')?.addEventListener('change', async function() {
+    await window.miseAPI.mise.setSetting('auto_install', this.checked);
+    showToast(this.checked ? '已开启环境变更自动安装' : '已关闭环境变更自动安装', 'info');
+  });
+  document.getElementById('btn-refresh-mise-settings')?.addEventListener('click', async () => {
+    await loadMiseSettings();
+    showToast('运行时设定已刷新', 'info');
+  });
+  document.getElementById('btn-install-missing-tools')?.addEventListener('click', installMissingTools);
 
   // ── 主题模式控制 ──
   document.getElementById('btn-theme-toggle')?.addEventListener('click', () => {
