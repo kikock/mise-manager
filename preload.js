@@ -11,7 +11,8 @@ contextBridge.exposeInMainWorld('miseAPI', {
 
   // mise 操作
   mise: {
-    check:         () => ipcRenderer.invoke('mise:check'),
+    check:         (forceRefresh = false) => ipcRenderer.invoke('mise:check', forceRefresh),
+    abortExec:     () => ipcRenderer.invoke('mise:abortExec'),
     where:         (toolVersion) => ipcRenderer.invoke('mise:where', toolVersion),
     listInstalled: () => ipcRenderer.invoke('mise:listInstalled'),
     use:           (tool, version, isGlobal, cwd) => ipcRenderer.invoke('mise:use', { tool, version, isGlobal, cwd }),

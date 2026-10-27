@@ -375,13 +375,13 @@ function restoreCachedState() {
   }
 }
 
-/** 检测 mise 运行状态与配置路径（并发并行执行，提速 2 倍以上） */
-async function checkMiseStatus() {
+/** 检测 mise 运行状态与配置路径（支持毫秒级内存缓存秒开，消除界面白屏卡顿） */
+async function checkMiseStatus(forceRefresh = false) {
   try {
     // 并发获取配置与 mise 安装状态
     const [cfg, result] = await Promise.all([
       window.miseAPI.config.get().catch(() => ({})),
-      window.miseAPI.mise.check().catch(() => ({ installed: false })),
+      window.miseAPI.mise.check(forceRefresh).catch(() => ({ installed: false })),
     ]);
 
     AppState.miseDataDir = cfg.miseDataDir || result.miseDataDir || '';
@@ -633,27 +633,138 @@ async function installMise() {
   }
 }
 
+let isUpgradingMise = false;
+
 async function upgradeMise() {
+  if (isUpgradingMise) return;
   const btn = document.getElementById('btn-upgrade-mise');
   const termWrap = document.getElementById('home-terminal-wrap');
   const termOut = document.getElementById('home-terminal-output');
+  const progressWrap = document.getElementById('upgrade-progress-wrap');
+  const progressStatus = document.getElementById('upgrade-progress-status');
+  const progressPercent = document.getElementById('upgrade-progress-percent');
+  const progressFill = document.getElementById('upgrade-progress-fill');
+  const progressDetail = document.getElementById('upgrade-progress-detail');
+  const btnCancel = document.getElementById('btn-cancel-upgrade');
 
+  isUpgradingMise = true;
   btn.classList.add('loading');
   btn.textContent = '升级中...';
+  btn.disabled = true;
+
+  if (progressWrap) progressWrap.style.display = 'block';
+  if (progressPercent) progressPercent.textContent = '5%';
+  if (progressFill) progressFill.style.width = '5%';
+  if (progressStatus) progressStatus.textContent = '正在启动升级任务...';
+  if (progressDetail) progressDetail.textContent = '正在连接 GitHub 发行源 (若较慢可先在设置配置代理)...';
+
   clearTerminal(termOut, termWrap);
+  if (termWrap) termWrap.style.display = 'block';
 
-  window.miseAPI.mise.onStream((data) => appendTerminal(termOut, data));
-  const result = await window.miseAPI.mise.exec(['self-update']);
-  window.miseAPI.mise.removeStreamListener();
+  let currentPercent = 5;
+  const updateProgress = (pct, statusText, detailText) => {
+    if (pct > currentPercent) {
+      currentPercent = Math.min(pct, 98);
+      if (progressPercent) progressPercent.textContent = `${Math.round(currentPercent)}%`;
+      if (progressFill) progressFill.style.width = `${currentPercent}%`;
+    }
+    if (statusText && progressStatus) progressStatus.textContent = statusText;
+    if (detailText && progressDetail) progressDetail.textContent = detailText;
+  };
 
-  btn.classList.remove('loading');
-  btn.textContent = '升级到最新版本';
+  // 绑定取消按钮
+  let userAborted = false;
+  if (btnCancel) {
+    btnCancel.onclick = async () => {
+      userAborted = true;
+      if (progressStatus) progressStatus.textContent = '正在中止升级任务...';
+      if (progressDetail) progressDetail.textContent = '已发送终止信号...';
+      appendTerminal(termOut, '\r\n⚠️ 用户手动中止了升级操作。\r\n');
+      try {
+        await window.miseAPI.mise.abortExec();
+      } catch (e) {}
+    };
+  }
+
+  // 监听输出流进行智能进度解析
+  window.miseAPI.mise.onStream((data) => {
+    appendTerminal(termOut, data);
+    const text = String(data).toLowerCase();
+
+    if (text.includes('checking') || text.includes('github') || text.includes('version') || text.includes('fetching')) {
+      updateProgress(25, '正在检查最新版本与下载源...', '已连接 GitHub 仓库，正在检索发行构建...');
+    } else if (text.includes('downloading') || text.includes('mise-v') || text.includes('.zip') || text.includes('.tar.gz')) {
+      updateProgress(55, '正在下载最新构建资产...', '正在拉取 mise 预编译二进制组件...');
+    } else if (text.includes('extracting') || text.includes('installing') || text.includes('replacing') || text.includes('upgrading')) {
+      updateProgress(85, '正在解压并更新 mise 核心...', '解压资源并替换可执行程序...');
+    } else if (text.includes('updated mise to') || text.includes('already up to date')) {
+      updateProgress(100, '升级已完成！', '核心程序已更新至最新稳定版。');
+    } else {
+      // 提取可能的详细信息行
+      const lines = String(data).trim().split(/\r?\n/).filter(Boolean);
+      if (lines.length > 0) {
+        const lastLine = lines[lines.length - 1].replace(/\x1B\[[0-9;]*[a-zA-Z]/g, '').trim();
+        if (lastLine && progressDetail) {
+          progressDetail.textContent = lastLine.slice(0, 80);
+        }
+      }
+    }
+  });
+
+  // 超时熔断保护：120 秒
+  let timeoutTriggered = false;
+  const timer = setTimeout(async () => {
+    if (isUpgradingMise) {
+      timeoutTriggered = true;
+      appendTerminal(termOut, '\r\n⚠️ 升级任务超过 120 秒无响应，可能因网络连接 GitHub 受限，已自动保护性终止。\r\n💡 建议在右上方“设置”中配置本地代理 (如 http://127.0.0.1:7890) 后重试。\r\n');
+      try {
+        await window.miseAPI.mise.abortExec();
+      } catch (e) {}
+    }
+  }, 120000);
+
+  let result;
+  try {
+    // 关键修复：加入 -y 自动确认参数，避免卡在 stdin 提示中
+    result = await window.miseAPI.mise.exec(['self-update', '-y']);
+  } catch (err) {
+    result = { success: false, output: err.message };
+  } finally {
+    clearTimeout(timer);
+    window.miseAPI.mise.removeStreamListener();
+    isUpgradingMise = false;
+    btn.classList.remove('loading');
+    btn.textContent = '⬆️ 升级到最新版本';
+    btn.disabled = false;
+  }
+
+  if (userAborted) {
+    if (progressWrap) progressWrap.style.display = 'none';
+    showToast('已取消升级任务', 'info');
+    return;
+  }
+
+  if (timeoutTriggered) {
+    if (progressStatus) progressStatus.textContent = '升级超时';
+    if (progressDetail) progressDetail.textContent = '网络访问受限，请配置代理后重试';
+    showToast('升级超时：国内直连 GitHub 受限，建议在设置中配置代理后重试', 'error');
+    return;
+  }
 
   if (result.success) {
+    if (progressPercent) progressPercent.textContent = '100%';
+    if (progressFill) progressFill.style.width = '100%';
+    if (progressStatus) progressStatus.textContent = '✅ 升级完成！';
+    if (progressDetail) progressDetail.textContent = 'mise 核心已成功更新。';
     showToast('mise 核心已升级到最新版本！', 'success');
-    await checkMiseStatus();
+    setTimeout(() => {
+      if (progressWrap) progressWrap.style.display = 'none';
+    }, 4000);
+    await checkMiseStatus(true);
   } else {
-    showToast('升级失败：' + (result.output || ''), 'error');
+    if (progressStatus) progressStatus.textContent = '❌ 升级未完成';
+    if (progressDetail) progressDetail.textContent = '详情请查看下方控制台日志';
+    showToast('升级未完成，请检查控制台日志或代理配置', 'error');
   }
 }
 
@@ -1920,7 +2031,10 @@ function bindEvents() {
   document.getElementById('btn-copy-modal-log')?.addEventListener('click', () => copyTerminalLog('modal-terminal-output'));
 
   // 首页按钮
-  document.getElementById('btn-refresh-status').onclick = checkMiseStatus;
+  document.getElementById('btn-refresh-status').onclick = () => {
+    showToast('正在实时重新核验 mise 核心状态...', 'info', 1500);
+    checkMiseStatus(true);
+  };
   document.getElementById('btn-install-mise').onclick   = installMise;
   document.getElementById('btn-upgrade-mise').onclick   = upgradeMise;
   document.getElementById('btn-open-config').onclick    = async () => {
@@ -2109,10 +2223,15 @@ function bindEvents() {
   };
 
   // 代理与清理
-  document.getElementById('btn-save-proxy').onclick = () => {
+  document.getElementById('btn-save-proxy').onclick = async () => {
     const v = document.getElementById('input-proxy').value.trim();
     localStorage.setItem('mise-proxy', v);
-    showToast('代理设置已保存', 'success');
+    try {
+      await window.miseAPI.config.set({ proxy: v });
+      showToast('代理设置已保存并同步给子进程与升级服务', 'success');
+    } catch (e) {
+      showToast('代理已保存到本地: ' + e.message, 'warning');
+    }
   };
   document.getElementById('btn-clean-cache').onclick = async () => {
     const r = await window.miseAPI.mise.exec(['cache', 'clear']);
@@ -2181,6 +2300,15 @@ async function init() {
   bindEvents();
   startClock();
   checkNetwork();
+
+  // 回填代理配置
+  try {
+    const savedProxy = localStorage.getItem('mise-proxy') || '';
+    const proxyInput = document.getElementById('input-proxy');
+    if (proxyInput && savedProxy) {
+      proxyInput.value = savedProxy;
+    }
+  } catch (e) {}
 
   // 1. 优先以微秒级恢复上次本地状态与已安装快照，实现秒开与零等待
   restoreCachedState();

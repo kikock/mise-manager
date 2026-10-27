@@ -110,11 +110,24 @@ function ensureLocalMiseExe() {
   return targetExe;
 }
 
-/** 构建携带完整 mise 路径变量的环境 */
+/** 构建携带完整 mise 路径变量与代理的环境 */
 function buildMiseEnv(overrides = {}) {
   const miseDataDir = getMiseDataDir();
   const miseBinDir  = getMiseBinDir(); // shims: .../data/shims
   const miseExeDir  = getMiseExeDir(); // bin: .../bin
+  const cfg         = loadConfig();
+  const proxy       = (cfg && cfg.proxy) || process.env.HTTP_PROXY || process.env.http_proxy || '';
+
+  const proxyEnv = {};
+  if (proxy && typeof proxy === 'string' && proxy.trim()) {
+    const p = proxy.trim();
+    proxyEnv.HTTP_PROXY = p;
+    proxyEnv.HTTPS_PROXY = p;
+    proxyEnv.ALL_PROXY = p;
+    proxyEnv.http_proxy = p;
+    proxyEnv.https_proxy = p;
+    proxyEnv.all_proxy = p;
+  }
 
   return {
     ...process.env,
@@ -123,6 +136,7 @@ function buildMiseEnv(overrides = {}) {
     MISE_INSTALL_DIR: miseExeDir,
     // 将 shims 和 bin 目录前置到 PATH
     PATH: `${miseBinDir}${path.delimiter}${miseExeDir}${path.delimiter}${miseDataDir}${path.delimiter}${process.env.PATH || ''}`,
+    ...proxyEnv,
     ...overrides,
   };
 }
@@ -275,17 +289,33 @@ ipcMain.handle('window:maximize', () => {
 });
 ipcMain.handle('window:close', () => mainWindow.close());
 
+let currentExecProc = null;
+let miseCheckMemoryCache = null;
+
 // ─────────────────────────────────────────────
-// IPC 处理器：执行 mise 命令（同步，返回输出）
+// IPC 处理器：执行 mise 命令（同步，返回输出，支持中止）
 // ─────────────────────────────────────────────
 ipcMain.handle('mise:exec', async (event, args) => {
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     const cmdArgs = Array.isArray(args) ? args : args.split(' ');
     const miseExe = getMiseBinPath();
+
+    if (currentExecProc) {
+      try {
+        if (process.platform === 'win32' && currentExecProc.pid) {
+          exec(`taskkill /pid ${currentExecProc.pid} /f /t`);
+        } else {
+          currentExecProc.kill('SIGKILL');
+        }
+      } catch (e) {}
+      currentExecProc = null;
+    }
+
     const proc = spawn(miseExe || 'mise', cmdArgs, {
       shell: true,
       env: buildMiseEnv(),
     });
+    currentExecProc = proc;
 
     let stdout = '';
     let stderr = '';
@@ -305,7 +335,15 @@ ipcMain.handle('mise:exec', async (event, args) => {
       }
     });
 
+    const cleanup = () => {
+      if (currentExecProc === proc) {
+        currentExecProc = null;
+      }
+    };
+
     proc.on('close', (code) => {
+      cleanup();
+      miseCheckMemoryCache = null;
       if (code === 0) {
         resolve({ success: true, output: stdout });
       } else {
@@ -314,9 +352,31 @@ ipcMain.handle('mise:exec', async (event, args) => {
     });
 
     proc.on('error', (err) => {
+      cleanup();
       resolve({ success: false, output: err.message, code: -1 });
     });
   });
+});
+
+// ─────────────────────────────────────────────
+// IPC 处理器：中断当前正在执行的 mise 子进程
+// ─────────────────────────────────────────────
+ipcMain.handle('mise:abortExec', async () => {
+  if (currentExecProc) {
+    try {
+      const pid = currentExecProc.pid;
+      if (process.platform === 'win32' && pid) {
+        exec(`taskkill /pid ${pid} /f /t`);
+      } else {
+        currentExecProc.kill('SIGKILL');
+      }
+      currentExecProc = null;
+      return { success: true, message: '进程已成功终止' };
+    } catch (e) {
+      return { success: false, error: e.message };
+    }
+  }
+  return { success: true, message: '当前无正在运行的进程' };
 });
 
 // ─────────────────────────────────────────────
@@ -387,12 +447,34 @@ ipcMain.handle('mise:installAll', async () => {
 // ─────────────────────────────────────────────
 // IPC 处理器：检测 mise 是否已安装
 // ─────────────────────────────────────────────
-ipcMain.handle('mise:check', async () => {
+ipcMain.handle('mise:check', async (event, forceRefresh = false) => {
   return new Promise((resolve) => {
+    const miseExe = getMiseBinPath();
+
+    // 毫秒级状态缓存机制（基于文件修改时间戳与体积）
+    if (!forceRefresh && miseCheckMemoryCache && fs.existsSync(miseExe)) {
+      try {
+        const stat = fs.statSync(miseExe);
+        if (stat.mtimeMs === miseCheckMemoryCache.mtimeMs && stat.size === miseCheckMemoryCache.size) {
+          return resolve(miseCheckMemoryCache.data);
+        }
+      } catch (e) {}
+    }
+
     let resolved = false;
     const finish = (data) => {
       if (!resolved) {
         resolved = true;
+        if (data && data.installed && fs.existsSync(miseExe)) {
+          try {
+            const stat = fs.statSync(miseExe);
+            miseCheckMemoryCache = {
+              mtimeMs: stat.mtimeMs,
+              size: stat.size,
+              data,
+            };
+          } catch (e) {}
+        }
         resolve(data);
       }
     };
@@ -411,7 +493,6 @@ ipcMain.handle('mise:check', async () => {
       });
     }, 2500);
 
-    const miseExe = getMiseBinPath();
     const env = buildMiseEnv();
 
     const testExe = (exePath) => {
@@ -675,8 +756,8 @@ ipcMain.handle('mise:install', async (event, options = {}) => {
   try { fs.mkdirSync(miseDataDir, { recursive: true }); } catch {}
   try { fs.mkdirSync(miseBinDir,  { recursive: true }); } catch {}
 
-  // 持久化保存统一根目录
   saveConfig({ miseRootDir, miseDataDir, miseBinDir });
+  miseCheckMemoryCache = null;
 
   // 优先直接本地复制
   const existingExe = [
@@ -727,6 +808,7 @@ ipcMain.handle('mise:install', async (event, options = {}) => {
 // ─────────────────────────────────────────────
 ipcMain.handle('mise:uninstall', async () => {
   try {
+    miseCheckMemoryCache = null;
     const miseRootDir = getMiseRootDir();
     if (fs.existsSync(miseRootDir)) {
       fs.rmSync(miseRootDir, { recursive: true, force: true });
