@@ -39,8 +39,7 @@
     ],
     "windows": {
       "webviewInstallMode": {
-        "type": "offlineInstaller",
-        "path": "MicrosoftEdgeWebView2RuntimeInstallerX64.exe"
+        "type": "offlineInstaller"
       }
     }
   }
