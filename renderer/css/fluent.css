@@ -39,21 +39,22 @@
   --border-strong:    rgba(255,255,255,0.15);
   --border-accent:    rgba(0, 120, 212, 0.5);
 
-  /* ── 阴影 ── */
-  --shadow-sm:        0 2px 8px rgba(0,0,0,0.3);
-  --shadow-md:        0 4px 16px rgba(0,0,0,0.4);
-  --shadow-lg:        0 8px 32px rgba(0,0,0,0.5);
+  /* ── 阴影（对齐 Fluent Design 量化规范）── */
+  --shadow-sm:        0 2px 4px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+  --shadow-md:        0 4px 12px rgba(0,0,0,0.12);
+  --shadow-lg:        0 8px 16px rgba(0,0,0,0.14), 0 2px 4px rgba(0,0,0,0.08);
 
   /* ── 圆角 ── */
   --radius-sm:        4px;
   --radius-md:        8px;
-  --radius-lg:        12px;
-  --radius-xl:        16px;
+  --radius-lg:        8px;
+  --radius-xl:        12px;
 
-  /* ── 过渡 ── */
-  --transition-fast:  120ms cubic-bezier(0.4, 0, 0.2, 1);
-  --transition-med:   200ms cubic-bezier(0.4, 0, 0.2, 1);
-  --transition-slow:  350ms cubic-bezier(0.4, 0, 0.2, 1);
+  /* ── 过渡（动效时长 <= 200ms，统一 Fluent 标准缓动曲线）── */
+  --fluent-easing:    cubic-bezier(0.1, 0.9, 0.2, 1.0);
+  --transition-fast:  100ms var(--fluent-easing);
+  --transition-med:   150ms var(--fluent-easing);
+  --transition-slow:  200ms var(--fluent-easing);
 
   /* ── 字体与排版设计令牌 ── */
   --font-base:        'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI Variable Text', 'Segoe UI Variable', 'Segoe UI', 'Microsoft YaHei UI', 'Microsoft YaHei', 'PingFang SC', system-ui, sans-serif;
@@ -169,3 +170,159 @@ html, body {
 /* ── 可选择的区域 ── */
 .selectable { user-select: text; }
 input, textarea { user-select: text; }
+
+/* ==========================================================================
+   现代全景主题与 40+ 调色盘规范 (对标 v1.5.0)
+   ========================================================================== */
+
+.theme-card {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.theme-segmented {
+  display: inline-flex;
+  align-items: center;
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 3px;
+  gap: 2px;
+}
+
+[data-theme="light"] .theme-segmented {
+  background: rgba(0, 0, 0, 0.06);
+}
+
+.theme-seg-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 14px;
+  font-size: 12.5px;
+  border-radius: 16px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  font-weight: 500;
+}
+
+.theme-seg-btn:hover {
+  color: var(--text-primary);
+}
+
+.theme-seg-btn.active {
+  background: var(--bg-layer3);
+  color: var(--text-primary);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+  font-weight: 600;
+}
+
+.palette-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.color-swatch-circle {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  cursor: pointer;
+  border: 2px solid transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  position: relative;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.color-swatch-circle:hover {
+  transform: scale(1.15);
+}
+
+.color-swatch-circle.selected {
+  border-color: #ffffff;
+  transform: scale(1.18);
+  box-shadow: 0 0 0 2px #ffffff, 0 3px 8px rgba(0, 0, 0, 0.4);
+}
+
+[data-theme="light"] .color-swatch-circle.selected {
+  border-color: #1a1a1a;
+  box-shadow: 0 0 0 2px #1a1a1a, 0 3px 8px rgba(0, 0, 0, 0.25);
+}
+
+.color-swatch-circle .check-mark {
+  font-size: 13px;
+  font-weight: bold;
+  line-height: 1;
+}
+
+/* iOS / Fluent 现代 Switch 切换开关 */
+.fluent-switch {
+  position: relative;
+  display: inline-block;
+  width: 44px;
+  height: 24px;
+}
+
+.fluent-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.switch-slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(120, 120, 128, 0.32);
+  transition: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  border-radius: 24px;
+}
+
+.switch-slider:before {
+  position: absolute;
+  content: "";
+  height: 18px;
+  width: 18px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  transition: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  border-radius: 50%;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.fluent-switch input:checked + .switch-slider {
+  background-color: var(--accent);
+}
+
+.fluent-switch input:checked + .switch-slider:before {
+  transform: translateX(20px);
+}
+
+/* 模态弹窗危险按钮 */
+.btn-danger-confirm {
+  background: var(--error) !important;
+  color: #fff !important;
+  border-color: transparent !important;
+}
+
+.btn-danger-confirm:hover {
+  background: #a82315 !important;
+  box-shadow: 0 2px 8px rgba(196, 43, 28, 0.35) !important;
+}
+

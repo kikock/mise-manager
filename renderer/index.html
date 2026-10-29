@@ -590,19 +590,57 @@
             <button class="btn btn-danger btn-sm" id="btn-clean-cache">清理下载缓存</button>
           </div>
 
-          <!-- 外观与主题卡片 -->
-          <div class="card">
-            <div class="card-title" style="margin-bottom:8px">🎨 外观主题</div>
-            <p style="font-size:12.5px;color:var(--text-secondary);margin-bottom:12px">
-              选择适合您的 Windows 11 Fluent 视觉风格，支持浅色模式与深邃暗色：
-            </p>
-            <div class="flex gap-8 mb-12">
-              <button class="btn btn-secondary btn-sm" id="btn-theme-dark">🌙 深色模式</button>
-              <button class="btn btn-secondary btn-sm" id="btn-theme-light">☀️ 浅色模式</button>
-              <button class="btn btn-ghost btn-sm" id="btn-theme-auto">💻 跟随系统</button>
+          <!-- 外观与主题卡片 (对标 v1.5.0 规范) -->
+          <div class="card theme-card" style="grid-column: 1 / -1;">
+            <div class="flex-between" style="align-items:center;flex-wrap:wrap;gap:12px;">
+              <div>
+                <div class="card-title" style="margin-bottom:4px">🎨 外观主题与现代调色盘</div>
+                <div style="font-size:12px;color:var(--text-secondary)">
+                  自定义 Windows 11 Fluent 视觉光暗模式、40+ 精雕色盘与品牌强调色，即选即生效
+                </div>
+              </div>
+              <div class="theme-segmented">
+                <button class="theme-seg-btn" id="btn-theme-light-seg"><span>☼</span> 浅色</button>
+                <button class="theme-seg-btn" id="btn-theme-auto-seg"><span>💻</span> 系统</button>
+                <button class="theme-seg-btn" id="btn-theme-dark-seg"><span>☾</span> 深色</button>
+              </div>
             </div>
-            <div style="font-size:12px;color:var(--text-tertiary)">
-              当前主题：<span id="current-theme-label" style="color:var(--accent);font-weight:600">深色模式</span>
+
+            <div style="height:1px;background:var(--border);margin:4px 0"></div>
+
+            <!-- 色盘网格 -->
+            <div>
+              <div id="palette-title-label" style="font-size:12.5px;font-weight:600;margin-bottom:10px;color:var(--text-primary)">
+                精选调色盘色球 (30+ 款)
+              </div>
+              <div class="palette-grid" id="theme-palette-grid">
+                <!-- 动态由 theme.js / app.js 注入 -->
+              </div>
+            </div>
+
+            <div style="height:1px;background:var(--border);margin:4px 0"></div>
+
+            <!-- 自定义强调色 Switch -->
+            <div>
+              <div class="flex-between" style="align-items:center">
+                <div>
+                  <div style="font-size:13px;font-weight:600">使用自定义强调色</div>
+                  <div style="font-size:11.5px;color:var(--text-secondary);margin-top:2px">
+                    覆盖主题自带的品牌强调主色
+                  </div>
+                </div>
+                <label class="fluent-switch">
+                  <input type="checkbox" id="switch-custom-accent">
+                  <span class="switch-slider"></span>
+                </label>
+              </div>
+
+              <div id="custom-accent-palette-box" style="display:none;margin-top:14px;padding-top:12px;border-top:1px dashed var(--border)">
+                <div style="font-size:12px;color:var(--text-secondary);margin-bottom:8px">选择微软精选强调色：</div>
+                <div class="flex gap-8" id="accent-colors-row" style="flex-wrap:wrap">
+                  <!-- 动态注入强调色球 -->
+                </div>
+              </div>
             </div>
           </div>
 
@@ -818,6 +856,13 @@
   </div>
 </div>
 
+<script src="js/theme.js"></script>
+<script src="js/utils.js"></script>
+<script src="js/pages/home.js"></script>
+<script src="js/pages/market.js"></script>
+<script src="js/pages/installed.js"></script>
+<script src="js/pages/settings.js"></script>
+<script src="js/pages/updates.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>
