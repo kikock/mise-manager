@@ -129,3 +129,15 @@ pub async fn add_shims_to_user_path() -> AppResult<bool> {
         Ok(false)
     }
 }
+
+#[command]
+pub async fn hide_to_tray(window: tauri::WebviewWindow) -> AppResult<()> {
+    let _ = window.hide();
+    Ok(())
+}
+
+#[command]
+pub async fn exit_app(app: tauri::AppHandle) -> AppResult<()> {
+    app.exit(0);
+    Ok(())
+}

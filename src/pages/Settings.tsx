@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { AppConfig, MisePaths, SystemEnvStatus } from "../types/index.ts";
+import { TauriService } from "../services/tauri.ts";
 
 interface SettingsProps {
   config: AppConfig | null;
@@ -28,6 +29,9 @@ export const Settings: React.FC<SettingsProps> = ({
     }
   );
 
+  const [closeAction, setCloseAction] = useState<"ask" | "tray" | "quit">(
+    TauriService.getCloseAction()
+  );
   const [savedTips, setSavedTips] = useState(false);
 
   const handleSave = () => {
@@ -108,16 +112,61 @@ export const Settings: React.FC<SettingsProps> = ({
           />
         </div>
 
-        <div style={{ display: "flex", gap: 24, marginTop: 4 }}>
-          <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 13 }}>
-            <input
-              type="checkbox"
-              checked={form.close_to_tray}
-              onChange={(e) => setForm({ ...form, close_to_tray: e.target.checked })}
-            />
-            点击关闭窗口时最小化到系统托盘常驻
-          </label>
+        {/* 窗口与托盘行为 */}
+        <div style={{ marginTop: 8, padding: "14px", backgroundColor: "var(--bg-card)", borderRadius: "var(--radius-md)", border: "1px solid var(--border-subtle)" }}>
+          <div style={{ fontWeight: 600, fontSize: 13.5, marginBottom: 6 }}>
+            🗔 窗口控制与系统托盘行为
+          </div>
+          <div style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 12 }}>
+            点击主窗口右上角关闭按钮（X）时的默认行为：
+          </div>
+          <div style={{ display: "flex", gap: 16, flexWrap: "wrap", fontSize: 13, marginBottom: 10 }}>
+            <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
+              <input
+                type="radio"
+                name="closeAction"
+                value="ask"
+                checked={closeAction === "ask"}
+                onChange={() => {
+                  setCloseAction("ask");
+                  TauriService.setCloseAction("ask");
+                }}
+              />
+              <span>每次询问（弹窗提示）</span>
+            </label>
+            <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
+              <input
+                type="radio"
+                name="closeAction"
+                value="tray"
+                checked={closeAction === "tray"}
+                onChange={() => {
+                  setCloseAction("tray");
+                  TauriService.setCloseAction("tray");
+                }}
+              />
+              <span>最小化到托盘（不在任务栏显示）</span>
+            </label>
+            <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
+              <input
+                type="radio"
+                name="closeAction"
+                value="quit"
+                checked={closeAction === "quit"}
+                onChange={() => {
+                  setCloseAction("quit");
+                  TauriService.setCloseAction("quit");
+                }}
+              />
+              <span>直接退出程序</span>
+            </label>
+          </div>
+          <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
+            * 点击窗口最小化按钮（_）时，窗口将直接缩小至系统托盘，不再占用任务栏空间。
+          </div>
+        </div>
 
+        <div style={{ display: "flex", gap: 24, marginTop: 4 }}>
           <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 13 }}>
             <input
               type="checkbox"

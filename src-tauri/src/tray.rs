@@ -1,13 +1,15 @@
 use tauri::{
-    menu::{Menu, MenuItem},
+    menu::{Menu, MenuItem, PredefinedMenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
     AppHandle, Manager,
 };
 
 pub fn setup_tray(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
     let show_i = MenuItem::with_id(app, "show", "显示主窗口", true, None::<&str>)?;
+    let hide_i = MenuItem::with_id(app, "hide", "最小化到托盘", true, None::<&str>)?;
+    let sep = PredefinedMenuItem::separator(app)?;
     let quit_i = MenuItem::with_id(app, "quit", "退出程序", true, None::<&str>)?;
-    let menu = Menu::with_items(app, &[&show_i, &quit_i])?;
+    let menu = Menu::with_items(app, &[&show_i, &hide_i, &sep, &quit_i])?;
 
     let icon = app.default_window_icon().cloned().ok_or("找不到默认图标")?;
 
@@ -20,7 +22,13 @@ pub fn setup_tray(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
             "show" => {
                 if let Some(win) = app.get_webview_window("main") {
                     let _ = win.show();
+                    let _ = win.unminimize();
                     let _ = win.set_focus();
+                }
+            }
+            "hide" => {
+                if let Some(win) = app.get_webview_window("main") {
+                    let _ = win.hide();
                 }
             }
             "quit" => {
@@ -38,6 +46,7 @@ pub fn setup_tray(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
                 let app = tray.app_handle();
                 if let Some(win) = app.get_webview_window("main") {
                     let _ = win.show();
+                    let _ = win.unminimize();
                     let _ = win.set_focus();
                 }
             }

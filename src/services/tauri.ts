@@ -81,4 +81,33 @@ export const TauriService = {
       callback(event.payload);
     });
   },
+
+  // 隐藏窗口到托盘
+  async hideToTray(): Promise<void> {
+    return invoke<void>("hide_to_tray");
+  },
+
+  // 彻底退出应用
+  async exitApp(): Promise<void> {
+    return invoke<void>("exit_app");
+  },
+
+  // 监听窗口关闭按钮请求
+  onCloseRequested(callback: () => void): Promise<UnlistenFn> {
+    return listen("window-close-requested", () => {
+      callback();
+    });
+  },
+
+  // 获取关闭窗口行为配置
+  getCloseAction(): "ask" | "tray" | "quit" {
+    const val = localStorage.getItem("misemanager_close_action");
+    if (val === "tray" || val === "quit") return val;
+    return "ask";
+  },
+
+  // 保存关闭窗口行为配置
+  setCloseAction(action: "ask" | "tray" | "quit"): void {
+    localStorage.setItem("misemanager_close_action", action);
+  },
 };

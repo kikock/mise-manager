@@ -6,6 +6,7 @@ import { Home } from "./pages/Home.tsx";
 import { Installed } from "./pages/Installed.tsx";
 import { Market } from "./pages/Market.tsx";
 import { Settings } from "./pages/Settings.tsx";
+import { CloseActionModal } from "./components/CloseActionModal.tsx";
 import { TauriService } from "./services/tauri.ts";
 import {
   AppConfig,
@@ -20,6 +21,7 @@ export const App: React.FC = () => {
   const [theme, setTheme] = useState<string>("dark");
   const [isTerminalOpen, setIsTerminalOpen] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
+  const [isCloseModalOpen, setIsCloseModalOpen] = useState(false);
   const [terminalLogs, setTerminalLogs] = useState<string[]>([]);
 
   const [config, setConfig] = useState<AppConfig | null>(null);
@@ -54,15 +56,31 @@ export const App: React.FC = () => {
     refreshAllData();
 
     // 注册流式日志监听
-    let unlisten: (() => void) | null = null;
+    let unlistenStream: (() => void) | null = null;
     TauriService.onStreamOutput((line) => {
       setTerminalLogs((prev) => [...prev, line]);
     }).then((fn) => {
-      unlisten = fn;
+      unlistenStream = fn;
+    });
+
+    // 注册窗口关闭按钮拦截监听
+    let unlistenClose: (() => void) | null = null;
+    TauriService.onCloseRequested(() => {
+      const action = TauriService.getCloseAction();
+      if (action === "tray") {
+        TauriService.hideToTray();
+      } else if (action === "quit") {
+        TauriService.exitApp();
+      } else {
+        setIsCloseModalOpen(true);
+      }
+    }).then((fn) => {
+      unlistenClose = fn;
     });
 
     return () => {
-      if (unlisten) unlisten();
+      if (unlistenStream) unlistenStream();
+      if (unlistenClose) unlistenClose();
     };
   }, []);
 
@@ -111,6 +129,7 @@ export const App: React.FC = () => {
           isTerminalOpen={isTerminalOpen}
           onToggleTheme={toggleTheme}
           onToggleTerminal={() => setIsTerminalOpen(!isTerminalOpen)}
+          onHideToTray={() => TauriService.hideToTray()}
           onRefresh={refreshAllData}
         />
 
@@ -184,6 +203,21 @@ export const App: React.FC = () => {
         onClose={() => setIsTerminalOpen(false)}
         onClear={() => setTerminalLogs([])}
         onAbort={() => TauriService.abortExec()}
+      />
+
+      <CloseActionModal
+        isOpen={isCloseModalOpen}
+        onCancel={() => setIsCloseModalOpen(false)}
+        onHideToTray={(remember) => {
+          setIsCloseModalOpen(false);
+          if (remember) TauriService.setCloseAction("tray");
+          TauriService.hideToTray();
+        }}
+        onExitApp={(remember) => {
+          setIsCloseModalOpen(false);
+          if (remember) TauriService.setCloseAction("quit");
+          TauriService.exitApp();
+        }}
       />
     </div>
   );

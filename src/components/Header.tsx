@@ -7,6 +7,7 @@ interface HeaderProps {
   isTerminalOpen: boolean;
   onToggleTheme: () => void;
   onToggleTerminal: () => void;
+  onHideToTray: () => void;
   onRefresh: () => void;
 }
 
@@ -16,6 +17,7 @@ export const Header: React.FC<HeaderProps> = ({
   isTerminalOpen,
   onToggleTheme,
   onToggleTerminal,
+  onHideToTray,
   onRefresh,
 }) => {
   const titles: Record<NavTab, string> = {
@@ -35,6 +37,13 @@ export const Header: React.FC<HeaderProps> = ({
           title="刷新数据"
         >
           🔄 刷新
+        </button>
+        <button
+          className="btn btn-secondary"
+          onClick={onHideToTray}
+          title="缩小至系统托盘常驻（不在任务栏占位）"
+        >
+          📥 缩小至托盘
         </button>
         <button
           className="btn btn-secondary"

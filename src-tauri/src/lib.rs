@@ -25,12 +25,18 @@ pub fn run() {
             Ok(())
         })
         .on_window_event(|window, event| {
-            if let WindowEvent::CloseRequested { api, .. } = event {
-                let config = mise::config::ConfigManager::load_config();
-                if config.close_to_tray {
+            use tauri::Emitter;
+            match event {
+                WindowEvent::CloseRequested { api, .. } => {
                     api.prevent_close();
-                    let _ = window.hide();
+                    let _ = window.emit("window-close-requested", ());
                 }
+                WindowEvent::Resized(_) => {
+                    if window.is_minimized().unwrap_or(false) {
+                        let _ = window.hide();
+                    }
+                }
+                _ => {}
             }
         })
         .invoke_handler(tauri::generate_handler![
@@ -50,6 +56,8 @@ pub fn run() {
             open_directory,
             check_system_env,
             add_shims_to_user_path,
+            hide_to_tray,
+            exit_app,
         ])
         .run(tauri::generate_context!())
         .expect("运行 Tauri 应用程序时发生致命错误");
