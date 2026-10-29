@@ -1,7 +1,7 @@
 {
   "name": "mise-manager",
   "private": true,
-  "version": "2.0.0",
+  "version": "2.0.1",
   "type": "module",
   "description": "Windows 11 风格的 mise 版本管理器桌面应用 (Tauri 2.x + Rust 原生底层 + Fluent Design)",
   "author": "caokui <34462958@qq.com>",
