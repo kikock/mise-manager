@@ -1,7 +1,8 @@
 # mise-manager 项目级开发规范与最高准则 (rules.md)
 
 ## 1. 核心架构与技术栈约束
-- **主框架**：Electron 32 (x64) + Node.js 异步流式子进程 + Fluent Design 设计系统。
+- **主框架**：Tauri 2.x (x64) + Rust 异步原生底层 + Vite/React 18 + Fluent Design 设计系统。
+- **发布双轨制**：必须同时提供轻量便携版（使用系统 WebView2）与含离线安装器的完整版（保证无 WebView2 亦可离线自愈运行）。
 - **工作流与审查规范**：必须强制遵守 [.agents/workflows/code-review-standards.md](file:///.agents/workflows/code-review-standards.md) 中的全部量化指标。
 
 ## 2. 核心量化指标红线

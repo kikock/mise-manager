@@ -6,6 +6,8 @@ node_modules/
 # Build artifacts & Dist
 dist/
 build/*.tmp
+src-tauri/target/
+release_artifacts/
 
 # Runtime data & Mise unified local installations
 mise/data/

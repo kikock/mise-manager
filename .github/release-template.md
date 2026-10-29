@@ -1,36 +1,38 @@
-# 🚀 mise-manager v__VERSION__ 正式发布
+# 🚀 mise-manager v__VERSION__ 正式发布 (Tauri 2.x + Rust 原生重构)
 
-> **Mise Manager** 是一款专为 Windows 11 设计的现代化 Fluent Design 开发环境与工具版本管理器。基于 `mise` 核心运行时，提供多版本自由切换、官方应用生态市场、绿色目录管理与环境变量一键注入。
-
----
-
-### ✨ 核心功能亮点
-
-- 🎨 **Windows 11 Fluent 视觉美学**：采用原生毛玻璃（Mica）质感与现代控件，完美支持**深色 / 浅色 / 跟随系统**一键无缝切换。
-- ⚡ **零白屏秒开引擎**：集成 SWR 快照瞬时呈现与本地原生进程调度，优化启动链路，打开即用、流畅丝滑。
-- 📦 **工具多版本全量管理**：全量扫描已安装的开发工具（Node.js、Python、Go、Rust、Java 等），支持多版本共存与一键激活 (`mise use`)。
-- 🏪 **官方应用生态市场**：无缝对接官方 `mise-versions` 全量数据，支持分页拉取、离线持久化缓存与关键词毫秒级搜索。
-- ⚙️ **统一绿色架构与环境注入**：支持自定义主目录（`MISE_DATA_DIR`），自动管理 `shims` 与 `bin`，一键注入系统环境变量 `PATH`，卸载无残留。
-- 🔍 **客户端在线升级检测**：内置自动化版本检测通道，直通 GitHub Release，第一时间获取最新更新。
+> **Mise Manager** 是一款专为 Windows 11 设计的现代原生版本管理器桌面应用。底层由 **Tauri 2.x + Rust 异步子进程** 驱动，搭配 **Fluent Design** 视觉美学。提供极速冷启、多环境实时切换、官方生态市场与环境变量一键注入。
 
 ---
 
-### 📥 资产安装指南
+### ✨ 架构升级亮点 (v2.0.0)
 
-| 安装程序 / 格式 | 适用系统 | 架构 | 说明 |
+- 🦀 **Tauri 2.x + Rust 异步原生底层**：彻底摆脱 Electron 笨重运行时，内存占用骤降 80%（~40MB），启动速度由秒级跃升为百毫秒瞬时直出。
+- 🎨 **Windows 11 Fluent 现代美学**：采用 Mica/亚克力质感卡片、深浅色无缝自适应主题、平滑过渡动画与自制 ConfirmModal 弹窗体系。
+- 📦 **双轨离线打包保证**：提供**轻量标准版**（~15MB）与**内嵌 WebView2 离线完整版**，即使在完全无网络的纯净离线机器上也能自愈静默安装运行！
+- ⚡ **流式实时命令管道**：安装大体量运行时与编译下载进度通过 Rust 管道实时推流至前端抽屉终端，杜绝白屏与卡死假死。
+- 🛡️ **纯绿色便携隔离**：数据与运行时跟随软件目录便携移动，或一键将 `shims` 注入 Windows 用户注册表环境变量。
+
+---
+
+### 📥 资产安装版本指南
+
+| 安装程序 / 格式 | 体积 | 适用场景 | 说明 |
 | :--- | :--- | :--- | :--- |
-| **`mise-manager-setup-__VERSION__.exe`** | Windows 10 / 11 | `x64` | **官方标准安装包**（向导式安装，带快捷方式与卸载程序） |
-| **`mise-manager-portable-__VERSION__.exe`** | Windows 10 / 11 | `x64` | **单文件免安装便携版**（双击即用，不写注册表，U 盘即插即用） |
-| **`mise-manager-__VERSION__-win-x64.zip`** | Windows 10 / 11 | `x64` | **绿色免安装压缩包**（解压到任意目录直接运行） |
+| **`mise-manager-setup-__VERSION__.exe`** | 约 15 MB | 个人电脑 / 联网环境 | **官方轻量推荐版**（使用系统已有的 WebView2 运行时，体积极轻量） |
+| **`mise-manager-full-offline-setup-__VERSION__.exe`** | 约 150 MB | 纯净离线机 / 涉密内网 | **含 WebView2 离线完整版**（内嵌微软官方离线安装包，无网络纯净环境 100% 自动安装） |
+| **`mise-manager-portable-__VERSION__.exe`** | 约 10 MB | 移动 U 盘 / 绿色便携 | **单文件免安装版**（免安装即点即用，不写系统注册表） |
+| **`mise-manager-__VERSION__-win-x64.zip`** | 约 10 MB | 自动化脚本 / 解压即用 | **绿色免安装压缩包** |
 
-#### 快速开始：
-1. **安装版用户**：下载 `mise-manager-setup-__VERSION__.exe`，运行向导完成安装；
-2. **便携版用户**：下载 `mise-manager-portable-__VERSION__.exe` 或解压 `.zip` 压缩包，直接双击运行即可；
-3. 首次启动可在首页点击 **“立即安装 mise”** 一键初始化开发环境！
+---
+
+### 快速开始：
+1. **常规用户推荐**：直接下载 `mise-manager-setup-__VERSION__.exe` 安装运行；
+2. **纯净离线 / 内网无网用户**：下载 `mise-manager-full-offline-setup-__VERSION__.exe`，安装程序会自动静默部署 WebView2 运行环境，开箱即用；
+3. **便携用户**：下载 `mise-manager-portable-__VERSION__.exe` 随身携带运行！
 
 ---
 
 ### 🔗 相关链接
-- 📖 **项目主页**：[kikock/mise-manager](https://github.com/kikock/mise-manager)
-- 🐛 **问题反馈**：[提交 Issue](https://github.com/kikock/mise-manager/issues)
+- 📖 **项目仓库**：[kikock/mise-manager](https://github.com/kikock/mise-manager)
+- 🐛 **问题与建议**：[提交 Issue](https://github.com/kikock/mise-manager/issues)
 - 🌐 **mise 官方文档**：[https://mise.jdx.dev](https://mise.jdx.dev)

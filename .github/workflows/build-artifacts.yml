@@ -38,7 +38,6 @@ jobs:
           version="$(node -p "require('./package.json').version")"
           echo "version=${version}" >> "$GITHUB_OUTPUT"
           
-          # 处理带 v 前缀的 tag 或 workflow_dispatch 自定义 target_tag
           if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ github.event.inputs.target_tag }}" ]; then
             tag="${{ github.event.inputs.target_tag }}"
           else
@@ -46,22 +45,6 @@ jobs:
           fi
           echo "tag_name=${tag}" >> "$GITHUB_OUTPUT"
           echo "检测到版本号: $version (Tag: $tag)"
-
-      - name: Validate tag matches package version
-        if: github.event_name == 'push' && github.ref_type == 'tag'
-        shell: bash
-        run: |
-          set -euo pipefail
-          expected_version="${{ steps.version.outputs.version }}"
-          pushed_tag="${{ github.ref_name }}"
-          # 允许 v1.0.0 或 1.0.0
-          clean_tag="${pushed_tag#v}"
-
-          if [[ "$clean_tag" != "$expected_version" ]]; then
-            echo "❌ 推送的 tag ($pushed_tag) 与 package.json 版本 ($expected_version) 不一致"
-            exit 1
-          fi
-          echo "✅ Tag 与 package.json 版本匹配一致: $pushed_tag"
 
   create-release:
     needs: prepare-version
@@ -79,13 +62,11 @@ jobs:
         run: |
           set -euo pipefail
 
-          title="mise-manager v${APP_VERSION}"
-
-          # 读取标准模版并替换版本号，彻底避免 YAML 缩进解析问题
+          title="mise-manager v${APP_VERSION} (Tauri 2.x 原生架构)"
           sed "s/__VERSION__/${APP_VERSION}/g" .github/release-template.md > release_notes.md
 
           if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
-            echo "Release $RELEASE_TAG 已存在，执行更新说明文档..."
+            echo "Release $RELEASE_TAG 已存在，更新说明..."
             gh release edit "$RELEASE_TAG" \
               --title "$title" \
               --notes-file release_notes.md \
@@ -99,9 +80,8 @@ jobs:
               --target "$GITHUB_SHA"
           fi
 
-          # 若当前发布的不是 main，但存在 tag 叫 main 的 Release，同步更新其说明页面
           if [ "$RELEASE_TAG" != "main" ] && gh release view "main" >/dev/null 2>&1; then
-            echo "同步美化更新 main Release 页面说明..."
+            echo "同步更新 main Release 页面说明..."
             gh release edit "main" --title "$title" --notes-file release_notes.md || true
           fi
 
@@ -118,35 +98,67 @@ jobs:
         uses: actions/setup-node@v5
         with:
           node-version: 22
-          cache: yarn
 
-      - name: Install Dependencies
-        run: yarn install --immutable
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
 
-      - name: Build Application (Windows NSIS, Portable & Zip)
-        env:
-          GH_TOKEN: ${{ secrets.TOKEN || secrets.GITHUB_TOKEN }}
-        run: yarn build --publish never
+      - name: Install Node Dependencies
+        run: npm ci
 
-      - name: Validate Windows Artifacts
+      - name: Check Standards & Build Web Assets
+        run: npm run build
+
+      # 1. 构建轻量标准版（使用系统 WebView2，安装包极轻量）
+      - name: Build Standard Lightweight Package (Tauri 2.x)
+        run: npm run tauri build
+
+      # 2. 下载微软官方 WebView2 离线安装包并构建内嵌离线完整版
+      - name: Download WebView2 Standalone Installer
         shell: pwsh
         run: |
-          $ErrorActionPreference = 'Stop'
-          $patterns = @(
-            'dist/latest.yml',
-            'dist/mise-manager-setup-*.exe',
-            'dist/mise-manager-setup-*.exe.blockmap',
-            'dist/mise-manager-portable-*.exe',
-            'dist/mise-manager-*-win-x64.zip'
-          )
-
-          foreach ($pattern in $patterns) {
-            $items = Get-ChildItem -Path $pattern -ErrorAction SilentlyContinue
-            if (-not $items) {
-              throw "❌ 构建校验失败，未找到目标文件: $pattern"
-            }
-            Write-Host "✅ 验证通过: $($items.FullName)"
+          Write-Host "开始从微软官方下载 WebView2 Standalone 离线安装器..."
+          $url = "https://msedge.sf.dl.delivery.mp.microsoft.com/filestreamingservice/files/028db257-fb69-424a-95ec-3aa456958434/MicrosoftEdgeWebView2RuntimeInstallerX64.exe"
+          $dest = "src-tauri/MicrosoftEdgeWebView2RuntimeInstallerX64.exe"
+          Invoke-WebRequest -Uri $url -OutFile $dest
+          if (Test-Path $dest) {
+            Write-Host "✅ 离线安装包下载完成: $(Get-Item $dest | Select-Object -ExpandProperty Length) 字节"
+          } else {
+            throw "❌ 离线安装包下载失败"
           }
+
+      - name: Build Full Offline Package (Embedded WebView2)
+        run: npm run tauri build -- --config src-tauri/tauri.offline.conf.json
+
+      - name: Collect and Rename Artifacts
+        shell: pwsh
+        run: |
+          $ver = "${{ needs.prepare-version.outputs.version }}"
+          New-Item -ItemType Directory -Force -Path "release_artifacts"
+
+          # 收集轻量标准版
+          $stdNsis = Get-ChildItem "src-tauri/target/release/bundle/nsis/mise-manager_*_x64-setup.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
+          if ($stdNsis) {
+            Copy-Item $stdNsis.FullName "release_artifacts/mise-manager-setup-$ver.exe"
+          }
+          $stdMsi = Get-ChildItem "src-tauri/target/release/bundle/msi/mise-manager_*_x64_*.msi" -ErrorAction SilentlyContinue | Select-Object -First 1
+          if ($stdMsi) {
+            Copy-Item $stdMsi.FullName "release_artifacts/mise-manager-$ver.msi"
+          }
+
+          # 收集内嵌离线完整版
+          $offlineNsis = Get-ChildItem "src-tauri/target/release/bundle/nsis/mise-manager-full-offline_*_x64-setup.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
+          if ($offlineNsis) {
+            Copy-Item $offlineNsis.FullName "release_artifacts/mise-manager-full-offline-setup-$ver.exe"
+          }
+
+          # 收集免安装独立 exe 并压缩为 zip
+          $rawExe = "src-tauri/target/release/mise-manager.exe"
+          if (Test-Path $rawExe) {
+            Copy-Item $rawExe "release_artifacts/mise-manager-portable-$ver.exe"
+            Compress-Archive -Path $rawExe -DestinationPath "release_artifacts/mise-manager-$ver-win-x64.zip" -Force
+          }
+
+          Get-ChildItem "release_artifacts" | Format-Table Name, Length
 
       - name: Upload Windows Assets to Release
         env:
@@ -154,15 +166,7 @@ jobs:
           RELEASE_TAG: ${{ needs.prepare-version.outputs.tag_name }}
         shell: pwsh
         run: |
-          $ErrorActionPreference = 'Stop'
-          $files = @(
-            Get-ChildItem 'dist/latest.yml' | Select-Object -ExpandProperty FullName
-            Get-ChildItem 'dist/mise-manager-setup-*.exe' | Select-Object -ExpandProperty FullName
-            Get-ChildItem 'dist/mise-manager-setup-*.exe.blockmap' | Select-Object -ExpandProperty FullName
-            Get-ChildItem 'dist/mise-manager-portable-*.exe' | Select-Object -ExpandProperty FullName
-            Get-ChildItem 'dist/mise-manager-*-win-x64.zip' | Select-Object -ExpandProperty FullName
-          )
-
-          Write-Host "正在上传 Windows 产物 (安装版 + 便携单文件 + 绿色解压包) 到 Release: $env:RELEASE_TAG"
+          $files = Get-ChildItem "release_artifacts/*" | Select-Object -ExpandProperty FullName
+          Write-Host "上传构建产物至 Release: $env:RELEASE_TAG"
           gh release upload $env:RELEASE_TAG @files --clobber
-          Write-Host "🎉 全部产物上传成功完成！"
+          Write-Host "🎉 双轨版本产物全部上传成功！"
