@@ -16,7 +16,20 @@ description: mise-manager 代码审查与架构量化约束 (Electron 32 + 流�
 
 ## 2. 架构边界与工程底线 (Architecture Boundaries)
 
-### 2.1 Electron 32 与 Node.js 异步流式子进程
+### 2.1 Tauri 2.x 与 Rust 原生底层约束
+- **并发与扫描隔离**：
+  - 磁盘 Git 仓库扫描、大目录深度遍历、批量状态提取必须纯在 Rust 底层并行执行（采用 `rayon` 或 `tokio::spawn`）。
+  - 前端 React 层仅作为纯净无状态/展示层，严禁在前端通过 Shell 插件反复进行长耗时管道拼接。
+- **安全与错误传播 (Zero Unwrap)**：
+  - 严禁在生产代码中使用未处理的 `.unwrap()` 或 `.expect()`。
+  - 所有文件 I/O 与 Git 探测必须通过 `Result<T, AppError>` 进行严格的类型传播。
+- **事件流控与反压**：
+  - Tauri Event 发射频率必须进行节流与防抖（`throttle/debounce >= 50ms`），禁止向前端高频发送细碎事件导致 WebView2 渲染管线卡死。
+- **性能基准**：
+  - 内存基线：空闲常驻内存 `<= 80MB`，深度扫描峰值内存 `<= 250MB`。
+
+
+### 2.2 Electron 32 与 Node.js 异步流式子进程
 - **I/O 隔离原则**：所有 mise CLI 执行、版本扫描、耗时命令必须交由 Node.js 异步子进程（`child_process.spawn`）通过流式管道（Stream Pipeline）处理。
 - **主线程非阻塞**：渲染主进程（Renderer）严禁调用任何同步阻塞操作或同步文件 I/O。
 - **流背压与分块控制**：
@@ -24,7 +37,8 @@ description: mise-manager 代码审查与架构量化约束 (Electron 32 + 流�
   - 必须实施流背压（Backpressure）机制，防止海量控制台输出直接塞爆渲染层。
 - **IPC 通信开销**：单次 IPC 通信耗时 `<= 16ms`（保障 60FPS 流畅），禁止跨进程传递循环引用或超过 10MB 的非分片大对象。
 
-### 2.2 Fluent Design 视觉设计规范（量化指标）
+
+### 2.3 Fluent Design 视觉设计规范（量化指标）
 - **圆角网格 (Corner Radius)**：
   - 小控件（按钮、输入框、下拉框、标签）：`4px`。
   - 容器卡片、模态弹窗、浮动面板：`8px`。

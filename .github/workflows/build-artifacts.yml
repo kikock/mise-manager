@@ -8,6 +8,8 @@ on:
         required: false
         default: 'main'
   push:
+    branches:
+      - main
     tags:
       - 'v*.*.*'
       - '*.*.*'
@@ -116,12 +118,17 @@ jobs:
       - name: Download WebView2 Standalone Installer
         shell: pwsh
         run: |
-          Write-Host "开始从微软官方下载 WebView2 Standalone 离线安装器..."
-          $url = "https://msedge.sf.dl.delivery.mp.microsoft.com/filestreamingservice/files/028db257-fb69-424a-95ec-3aa456958434/MicrosoftEdgeWebView2RuntimeInstallerX64.exe"
+          Write-Host "开始从微软官方永久重定向链接下载 WebView2 Standalone 离线安装器 (x64)..."
+          $ProgressPreference = 'SilentlyContinue'
+          $url = "https://go.microsoft.com/fwlink/?linkid=2124701"
           $dest = "src-tauri/MicrosoftEdgeWebView2RuntimeInstallerX64.exe"
-          Invoke-WebRequest -Uri $url -OutFile $dest
+          Invoke-WebRequest -Uri $url -OutFile $dest -MaximumRedirection 10
           if (Test-Path $dest) {
-            Write-Host "✅ 离线安装包下载完成: $(Get-Item $dest | Select-Object -ExpandProperty Length) 字节"
+            $bytes = (Get-Item $dest).Length
+            Write-Host "✅ 离线安装包下载完成: $bytes 字节 ($([math]::Round($bytes / 1MB, 2)) MB)"
+            if ($bytes -lt 50000000) {
+              throw "❌ 离线安装包大小异常 (<50MB)，可能下载不完整"
+            }
           } else {
             throw "❌ 离线安装包下载失败"
           }
