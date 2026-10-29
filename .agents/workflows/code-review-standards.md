@@ -1,5 +1,5 @@
 ---
-description: mise-manager 代码审查与架构量化约束 (Electron 32 + 流式子进程 + Fluent Design)
+description: mise-manager 代码审查与架构量化约束 (Tauri 2.x + Rust 异步原生底层 + Fluent Design)
 ---
 
 # mise-manager 核心量化指标与架构约束规范
@@ -8,8 +8,8 @@ description: mise-manager 代码审查与架构量化约束 (Electron 32 + 流�
 
 - **单文件长度 (File Length)**：推荐 `<= 300` 行，硬性上限 `<= 500` 行。超过 500 行必须重构分模块。
 - **单函数长度 (Function Length)**：推荐 `<= 30` 行，硬性上限 `<= 50` 行。
-- **单文件核心处理函数 (Functions per File)**：`<= 5` 个核心业务/IPC 处理函数，辅助工具函数移入 `utils/`。
-- **圈复杂度 (Cyclomatic Complexity)**：`<= 5`，严禁深层嵌套分支与复杂三元链。
+- **单文件核心处理函数 (Functions per File)**：`<= 5` 个核心业务/命令处理函数，辅助工具函数移入独立工具模块。
+- **圈复杂度 (Cyclomatic Complexity)**：`<= 5`，严禁深层嵌套分支与复杂多层三元表达式。
 - **IPC 接口参数 (IPC Interface Parameters)**：`<= 3` 个统一封装的 Payload 对象，严禁散装长参数。
 
 ---
@@ -18,25 +18,21 @@ description: mise-manager 代码审查与架构量化约束 (Electron 32 + 流�
 
 ### 2.1 Tauri 2.x 与 Rust 原生底层约束
 - **并发与扫描隔离**：
-  - 磁盘 Git 仓库扫描、大目录深度遍历、批量状态提取必须纯在 Rust 底层并行执行（采用 `rayon` 或 `tokio::spawn`）。
-  - 前端 React 层仅作为纯净无状态/展示层，严禁在前端通过 Shell 插件反复进行长耗时管道拼接。
+  - 所有耗时 CLI 操作（如 `mise install`、`mise ls-remote`、全量版本扫描）必须由 Rust 原生底层通过 `tokio::process::Command` 异步管道非阻塞执行。
+  - 前端 React/TypeScript 层仅作为纯净无状态/展示层，严禁在前端主线程进行大文件同步 I/O。
 - **安全与错误传播 (Zero Unwrap)**：
-  - 严禁在生产代码中使用未处理的 `.unwrap()` 或 `.expect()`。
-  - 所有文件 I/O 与 Git 探测必须通过 `Result<T, AppError>` 进行严格的类型传播。
+  - 严禁在生产 Rust 代码中使用未捕获处理的 `.unwrap()` 或 `.expect()`。
+  - 所有文件 I/O、进程执行与注册表写入必须通过 `Result<T, AppError>` 进行严格类型传播并序列化抛回前端。
 - **事件流控与反压**：
-  - Tauri Event 发射频率必须进行节流与防抖（`throttle/debounce >= 50ms`），禁止向前端高频发送细碎事件导致 WebView2 渲染管线卡死。
-- **性能基准**：
-  - 内存基线：空闲常驻内存 `<= 80MB`，深度扫描峰值内存 `<= 250MB`。
+  - 命令标准输出推流事件频率必须进行合理缓冲（Buffer Chunk `<= 64KB`），禁止单字节反复触发前端事件导致 WebView2 渲染管线假死。
+- **性能基准红线**：
+  - 内存基线：空闲常驻内存 `<= 50MB`（实际 ~35MB），大体积工具安装编译峰值内存 `<= 120MB`。
+  - 冷启动耗时：窗体创建至首屏就绪 `<= 200ms`。
 
-
-### 2.2 Electron 32 与 Node.js 异步流式子进程
-- **I/O 隔离原则**：所有 mise CLI 执行、版本扫描、耗时命令必须交由 Node.js 异步子进程（`child_process.spawn`）通过流式管道（Stream Pipeline）处理。
-- **主线程非阻塞**：渲染主进程（Renderer）严禁调用任何同步阻塞操作或同步文件 I/O。
-- **流背压与分块控制**：
-  - 单次传输数据块 Chunk 体积推荐 `<= 64KB`。
-  - 必须实施流背压（Backpressure）机制，防止海量控制台输出直接塞爆渲染层。
+### 2.2 Tauri IPC 与流式管道规范
+- **原生安全通信**：前端统一通过 `@tauri-apps/api/core` 的 `invoke` 机制调用 Rust 后端命令。
+- **双向事件推流**：长时间运行任务（如编译器下载与源码编译），Rust 端使用 `app_handle.emit()` 实时推送 stdout/stderr 流，前端由 `listen()` 接入抽屉控制台。
 - **IPC 通信开销**：单次 IPC 通信耗时 `<= 16ms`（保障 60FPS 流畅），禁止跨进程传递循环引用或超过 10MB 的非分片大对象。
-
 
 ### 2.3 Fluent Design 视觉设计规范（量化指标）
 - **圆角网格 (Corner Radius)**：
