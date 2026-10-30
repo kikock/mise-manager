@@ -74,13 +74,19 @@
   - 完美适配系统自定义深色/浅色模式无缝切换与沉浸式无边框标题栏。
 - 🦀 **Tauri 2.x + Rust 异步原生核心**
   - 采用 Rust 异步子进程与非阻塞管道执行 CLI 交互，安装输出毫秒级推流至前端抽屉终端，彻底杜绝界面卡顿。
+  - 常驻内存仅 ~35MB，冷启动 < 200ms，安装包仅 ~4MB，性能提升数倍。
 - 🏪 **丰富的工具版本生态市场**
   - 对接 [mise-versions](https://github.com/jdx/mise-versions) 官方数据源与 REST API，涵盖数百种主流语言、运行时和 CLI 工具。
   - 支持关键词模糊检索、分类筛选与历史版本探查，一键触发后台静默安装与版本部署。
-- 📦 **已安装工具精细化管理**
+- 📦 **已安装工具精细化管理与交互模态矩阵**
   - 集中监控本机所有通过 mise 管理的工具版本状态。
+  - 配备版本安装、安全卸载确认与自定义 mise 探测模态框，操作反馈配合全局 Toast 气泡瞬时直达。
   - 支持一键激活版本（Global / Local）、版本热切换、快速定位本地物理安装目录及安全卸载。
-- ⚙️ **灵活的路径与环境变量托管**
+- 🪟 **窗口生命周期管理与托盘常驻策略**
+  - 贴合专业桌面工具规范，提供“最小化到系统托盘”与“直接退出应用”两种关闭策略，支持记忆偏好与随时修改。
+  - Rust 核心拦截系统关闭事件，托盘支持一键恢复窗口与快捷退出。
+- ⚙️ **模块化卡片式设置与环境变量托管**
+  - 彻底模块化拆解为 7 大高内聚配置卡片（运行时、路径、环境、窗口、终端、代理/主题、关于）。
   - 自定义 `MISE_DATA_DIR`（数据安装根目录）与 `MISE_BIN_DIR`（Shims 二进制目录），支持便携移动盘与特定盘符部署。
   - 内置环境检测与 Windows 注册表一键写入，告别繁复的手工编辑系统 PATH 环节。
 
@@ -139,24 +145,27 @@ Mise Manager 充当了桌面可视化层与底层原生执行层之间的桥梁�
 
 ```mermaid
 graph TD
-    subgraph UI_Layer["前端展现层 (React 18 + Vite + TypeScript + Fluent Design)"]
-        A1[主页工作台 Dashboard]
-        A2[应用生态市场 Market]
-        A3[已安装工具管理 Installed]
-        A4[设置与系统环境 Settings]
+    subgraph UI_Layer["前端展现与交互层 (React 18 + Vite + TypeScript + Fluent Design)"]
+        A1[主页工作台 Home Dashboard]
+        A2[应用生态市场 Tool Market]
+        A3[已安装管理 Installed Tools]
+        A4[模块化设置中心 Settings Cards<br/>运行时/路径/环境/窗口/终端/主题/关于]
+        A5[模态交互矩阵 Modals & Toast<br/>关闭策略/版本安装/安全卸载/路径选择]
     end
 
     subgraph Bridge["Tauri 2.x 安全通信通道 (IPC Invoke & Event Emitter)"]
         B1["invoke('mise_exec') / invoke('mise_abort_exec')"]
         B2["invoke('get_app_config') / invoke('save_app_config')"]
-        B3["invoke('mise_list_installed') / invoke('mise_use_tool')"]
-        B4["window.listen('mise-stream-stdout / stderr') 实时管道推流"]
+        B3["invoke('open_folder_dialog') 原生目录选择"]
+        B4["invoke('mise_list_installed') / invoke('mise_use_tool')"]
+        B5["window.listen('mise-stream-stdout / stderr') 实时推流"]
     end
 
     subgraph Rust_Core["Tauri 2.x 原生 Rust 内核 (src-tauri)"]
         C1[MiseRunner 异步子进程调度引擎<br/>tokio::process::Command 非阻塞流]
         C2[Windows 注册表与系统环境管理器<br/>winreg 用户环境变量安全写入]
-        C3[全局系统托盘与窗口生命周期<br/>tauri::tray::TrayIconBuilder]
+        C3[全局系统托盘与生命周期拦截<br/>tauri::tray::TrayIconBuilder + on_window_event]
+        C4[系统对话框与原生 Shell 调用<br/>rfd / tauri_plugin_shell]
     end
 
     subgraph OS_Layer["操作系统与文件系统层"]
@@ -186,6 +195,13 @@ graph TD
 **答：这是未申请昂贵商业代码签名证书的开源软件在 Windows SmartScreen 机制下的正常表现，请放心使用。**
 - **秒级放行**：在拦截弹窗中点击 **「更多信息」 (More info)**，紧接着点击右下角浮现的 **「仍要运行」 (Run anyway)** 即可正常打开。系统在初次允许后将记忆授权，后续启动不再提示；
 - **备选方案**：鼠标右键点击安装包或 exe -> **「属性」** -> 在常规选项卡右下方勾选 **「解除锁定」 (Unblock)** -> 点击确定。
+
+### Q3: 点击右上角关闭按钮后，为什么程序仍在后台托盘运行？如何彻底退出？
+**答：这是为了保证后台工具链下载与快速唤醒的桌面端标准设计。**
+- **关闭策略自定义**：首次关闭时会弹出「关闭行为」对话框，支持选择 **「最小化到系统托盘」** 或 **「直接退出程序」**，并支持勾选“记住我的选择”；
+- **随时更改偏好**：可前往 **「设置」 -> 「窗口与系统托盘」** 卡片，随时切换关闭动作（询问 / 最小化托盘 / 退出应用）；
+- **极低常驻开销**：Tauri 2.x 极度轻量，即使常驻托盘，内存仅占用 ~35MB，CPU 占用率为 0%，几乎不消耗系统资源；
+- **托盘快速退出**：在任务栏右下角找到 Mise Manager 图标，鼠标右键点击并选择 **「退出」**，即可立即彻底退出程序。
 
 ---
 

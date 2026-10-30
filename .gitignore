@@ -10,8 +10,8 @@ src-tauri/target/
 release_artifacts/
 
 # Runtime data & Mise unified local installations
-mise/
-src-tauri/mise/
+/mise/
+/src-tauri/mise/
 *.log
 startup.log
 market_cache.json
