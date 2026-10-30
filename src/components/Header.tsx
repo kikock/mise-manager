@@ -3,22 +3,15 @@ import { NavTab } from "./Navigation.tsx";
 
 interface HeaderProps {
   currentTab: NavTab;
-  theme: string;
   isTerminalOpen: boolean;
-  onToggleTheme: () => void;
   onToggleTerminal: () => void;
-  onHideToTray: () => void;
-  onRefresh: () => void;
+  onRefresh?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
   currentTab,
-  theme,
   isTerminalOpen,
-  onToggleTheme,
   onToggleTerminal,
-  onHideToTray,
-  onRefresh,
 }) => {
   const titles: Record<NavTab, string> = {
     home: "运行环境概览与状态看板",
@@ -33,31 +26,10 @@ export const Header: React.FC<HeaderProps> = ({
       <div className="header-actions">
         <button
           className="btn btn-secondary"
-          onClick={onRefresh}
-          title="刷新数据"
-        >
-          🔄 刷新
-        </button>
-        <button
-          className="btn btn-secondary"
-          onClick={onHideToTray}
-          title="缩小至系统托盘常驻（不在任务栏占位）"
-        >
-          📥 缩小至托盘
-        </button>
-        <button
-          className="btn btn-secondary"
           onClick={onToggleTerminal}
           title="显示/隐藏实时终端"
         >
           🖥️ 终端 {isTerminalOpen ? "▲" : "▼"}
-        </button>
-        <button
-          className="btn btn-secondary"
-          onClick={onToggleTheme}
-          title="切换深浅主题"
-        >
-          {theme === "dark" ? "☀️ 浅色" : "🌙 深色"}
         </button>
       </div>
     </header>

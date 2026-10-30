@@ -82,34 +82,23 @@ impl ConfigManager {
 
         // 2. 检查便携目录: [app_dir]/mise/bin/mise.exe
         let portable_exe = app_dir.join("mise").join("bin").join("mise.exe");
-        if portable_exe.exists() {
+        if portable_exe.is_file() && portable_exe.exists() {
             return Some(portable_exe);
         }
 
-        // 3. 检查系统 PATH 中的 mise
-        if let Ok(p) = which::which("mise") {
-            return Some(p);
-        }
-        if let Ok(p) = which::which("mise.exe") {
-            return Some(p);
-        }
-
-        // 4. 检查常见 Windows 安装位置
-        if let Some(user_profile) = dirs::home_dir() {
-            let p1 = user_profile.join(".local").join("bin").join("mise.exe");
-            if p1.exists() {
-                return Some(p1);
-            }
-        }
-
-        if let Some(local_app_data) = dirs::data_local_dir() {
-            let p2 = local_app_data.join("mise").join("bin").join("mise.exe");
-            if p2.exists() {
-                return Some(p2);
-            }
-        }
-
         None
+    }
+
+    /// 确保所有核心目录（bin、data、data/shims 等）自动生成
+    pub fn ensure_directories() {
+        let paths = Self::resolve_paths();
+        let _ = fs::create_dir_all(&paths.root_dir);
+        let _ = fs::create_dir_all(Path::new(&paths.root_dir).join("bin"));
+        let _ = fs::create_dir_all(&paths.data_dir);
+        let _ = fs::create_dir_all(&paths.shims_dir);
+        let _ = fs::create_dir_all(Path::new(&paths.root_dir).join("cache"));
+        let _ = fs::create_dir_all(Path::new(&paths.root_dir).join("config"));
+        let _ = fs::create_dir_all(Path::new(&paths.root_dir).join("state"));
     }
 
     /// 解析完整 Mise 路径结构

@@ -80,7 +80,21 @@ it('TC-UI-01: Fluent Design 视觉度量衡量化标准符合 Windows 11 设计�
   assert.ok(combinedCss.includes('cubic-bezier') || /--transition/.test(combinedCss), '应定义过渡缓动或标准过渡');
 });
 
-// 4. 架构代码规模与单文件指标
+// 4. 窗口关闭拦截与系统托盘行为契约
+it('TC-CLOSE-01: CloseActionModal 应具备键盘监听与 Fluent 风格三态策略', () => {
+  const modalPath = path.resolve(__dirname, '../src/components/CloseActionModal.tsx');
+  assert.ok(fs.existsSync(modalPath), 'CloseActionModal.tsx 缺失');
+  const modalCode = fs.readFileSync(modalPath, 'utf8');
+  assert.ok(modalCode.includes('Escape') && modalCode.includes('Enter'), '应支持 Escape/Enter 键盘快捷键');
+  assert.ok(modalCode.includes('onHideToTray') && modalCode.includes('onExitApp'), '应支持托盘与彻底退出双分支');
+
+  const cardPath = path.resolve(__dirname, '../src/components/settings/SettingsWindowCard.tsx');
+  assert.ok(fs.existsSync(cardPath), 'SettingsWindowCard.tsx 缺失');
+  const cardCode = fs.readFileSync(cardPath, 'utf8');
+  assert.ok(cardCode.includes('ask') && cardCode.includes('tray') && cardCode.includes('quit'), '设置卡片应支持 ask/tray/quit 三态');
+});
+
+// 5. 架构代码规模与单文件指标
 it('TC-MET-01: 前端核心源码单文件全部 <= 500 行', () => {
   const srcDir = path.resolve(__dirname, '../src');
   function scan(dir) {

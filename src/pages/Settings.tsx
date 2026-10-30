@@ -1,21 +1,40 @@
-import React, { useState } from "react";
-import { AppConfig, MisePaths, SystemEnvStatus } from "../types/index.ts";
+import React, { useState, useEffect } from "react";
+import { AppConfig, MarketCacheInfo, MisePaths, SystemEnvStatus } from "../types/index.ts";
 import { TauriService } from "../services/tauri.ts";
+import { SettingsPathCard } from "../components/settings/SettingsPathCard.tsx";
+import { SettingsEnvCard } from "../components/settings/SettingsEnvCard.tsx";
+import { SettingsTerminalCard } from "../components/settings/SettingsTerminalCard.tsx";
+import { SettingsRuntimeCard } from "../components/settings/SettingsRuntimeCard.tsx";
+import { SettingsWindowCard } from "../components/settings/SettingsWindowCard.tsx";
+import { SettingsThemeProxyCard } from "../components/settings/SettingsThemeProxyCard.tsx";
+import { SettingsAboutCard } from "../components/settings/SettingsAboutCard.tsx";
 
 interface SettingsProps {
   config: AppConfig | null;
   paths: MisePaths | null;
   envStatus: SystemEnvStatus | null;
+  theme: string;
   onSaveConfig: (cfg: AppConfig) => void;
-  onFixEnvPath: () => void;
+  onRefreshAll: () => void;
+  onOpenDirectory: (path: string) => void;
+  onOpenExternal: (url: string) => void;
+  onSetTheme: (theme: string) => void;
+  onRunMiseCommand: (title: string, cmd: () => Promise<any>) => void;
+  showToast?: (content: string, type?: "success" | "info" | "warning" | "error") => void;
 }
 
 export const Settings: React.FC<SettingsProps> = ({
   config,
   paths,
   envStatus,
+  theme,
   onSaveConfig,
-  onFixEnvPath,
+  onRefreshAll,
+  onOpenDirectory,
+  onOpenExternal,
+  onSetTheme,
+  onRunMiseCommand,
+  showToast,
 }) => {
   const [form, setForm] = useState<AppConfig>(
     config || {
@@ -26,179 +45,226 @@ export const Settings: React.FC<SettingsProps> = ({
       theme: "dark",
       close_to_tray: true,
       auto_start: false,
+      not_found_auto_install: true,
+      auto_install: true,
+      proxy: "",
     }
   );
 
   const [closeAction, setCloseAction] = useState<"ask" | "tray" | "quit">(
     TauriService.getCloseAction()
   );
-  const [savedTips, setSavedTips] = useState(false);
 
-  const handleSave = () => {
-    onSaveConfig(form);
-    setSavedTips(true);
-    setTimeout(() => setSavedTips(false), 2000);
+  const [marketCacheInfo, setMarketCacheInfo] = useState<MarketCacheInfo | null>(null);
+
+  const fetchCacheInfo = async () => {
+    try {
+      const info = await TauriService.getMarketCacheInfo();
+      setMarketCacheInfo(info);
+    } catch (e) {
+      console.warn("读取市场缓存信息失败:", e);
+    }
   };
 
+  useEffect(() => {
+    fetchCacheInfo();
+  }, []);
+
+  const handleSavePaths = () => {
+    onSaveConfig(form);
+    showToast?.("路径与配置已保存", "success");
+  };
+
+  const handleResetDefaults = async () => {
+    try {
+      const newPaths = await TauriService.restoreDefaultPaths();
+      const updated: AppConfig = {
+        ...form,
+        custom_root_dir: newPaths.root_dir,
+        custom_mise_path: newPaths.exe_path,
+        mise_root_dir: newPaths.root_dir,
+        mise_data_dir: newPaths.data_dir,
+        mise_bin_dir: newPaths.shims_dir,
+      };
+      setForm(updated);
+      await onSaveConfig(updated);
+      onRefreshAll();
+      showToast?.(`已恢复并自动创建当前应用默认目录: ${newPaths.root_dir}`, "success");
+    } catch (e: any) {
+      showToast?.(`恢复默认目录失败: ${e?.message || String(e)}`, "error");
+    }
+  };
+
+
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-      {/* 环境变量一键修复 */}
-      <div className="fluent-card">
-        <h3 style={{ fontSize: 15, fontWeight: 600, marginBottom: 8 }}>
-          Windows 用户环境变量配置
-        </h3>
-        <p style={{ color: "var(--text-secondary)", fontSize: 13, marginBottom: 14 }}>
-          当前 Shims 路径: <code>{envStatus?.shims_dir || paths?.shims_dir}</code>
-        </p>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <span
-            style={{
-              color: envStatus?.path_has_shims ? "var(--success-color)" : "var(--warning-color)",
-              fontSize: 13,
-              fontWeight: 500,
-            }}
-          >
-            {envStatus?.path_has_shims ? "● 已注入系统用户 PATH 环境变量" : "○ 未注入 PATH 环境变量"}
-          </span>
-          <button className="btn btn-primary" onClick={onFixEnvPath}>
-            {envStatus?.path_has_shims ? "重新校验并刷新环境变量" : "一键添加至用户 PATH 并生效"}
-          </button>
+    <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+      {/* 顶部标题区 */}
+      <div>
+        <h2 style={{ fontSize: 20, fontWeight: 700, margin: "0 0 6px 0", color: "var(--text-primary)" }}>
+          设置
+        </h2>
+        <div style={{ fontSize: 13, color: "var(--text-secondary)" }}>
+          应用配置、mise 安装路径与环境变量管理
         </div>
       </div>
 
-      {/* 运行参数与路径定制 */}
-      <div className="fluent-card" style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-        <h3 style={{ fontSize: 15, fontWeight: 600 }}>运行参数与路径定制</h3>
+      {/* 1. 统一主目录与路径配置卡片 */}
+      <SettingsPathCard
+        form={form}
+        paths={paths}
+        onChangeForm={setForm}
+        onSavePaths={handleSavePaths}
+        onRefreshTools={() => {
+          onRefreshAll();
+          showToast?.("已刷新已下载应用列表", "success");
+        }}
+        onResetDefaults={handleResetDefaults}
+        onOpenDirectory={onOpenDirectory}
+        onUninstallMise={() =>
+          onRunMiseCommand("卸载本地 mise 核心程序与数据", () =>
+            TauriService.exec(["implode", "-y"])
+          )
+        }
+      />
 
-        <div>
-          <label style={{ display: "block", fontSize: 13, fontWeight: 500, marginBottom: 6 }}>
-            自定义 mise.exe 可执行文件绝对路径 (留空则智能探测)：
-          </label>
-          <input
-            type="text"
-            value={form.custom_mise_path || ""}
-            onChange={(e) => setForm({ ...form, custom_mise_path: e.target.value })}
-            placeholder="例如: D:\tools\mise\bin\mise.exe"
-            style={{
-              width: "100%",
-              padding: "8px 12px",
-              borderRadius: "var(--radius-md)",
-              border: "1px solid var(--border-subtle)",
-              backgroundColor: "var(--bg-input)",
-              color: "var(--text-primary)",
-              outline: "none",
-            }}
-          />
-        </div>
+      {/* 2. Windows 用户环境变量查看与配置表格 */}
+      <SettingsEnvCard
+        paths={paths}
+        envStatus={envStatus}
+        onRefreshEnv={() => {
+          onRefreshAll();
+          showToast?.("环境变量与系统 PATH 检测已刷新", "success");
+        }}
+        onApplyAllEnv={() =>
+          onRunMiseCommand("写入并同步 Windows 用户环境变量", async () => {
+            const res = await TauriService.applyAllUserEnv();
+            showToast?.("Windows 环境变量已成功写入并刷新系统", "success");
+            return res;
+          })
+        }
+        onRemoveAllEnv={() =>
+          onRunMiseCommand("清除 Windows 用户环境变量中的 mise 配置", async () => {
+            const res = await TauriService.removeAllUserEnv();
+            showToast?.("Windows 用户环境变量中的 mise 相关配置已清除", "info");
+            return res;
+          })
+        }
+      />
 
-        <div>
-          <label style={{ display: "block", fontSize: 13, fontWeight: 500, marginBottom: 6 }}>
-            国内镜像源加速 (针对 Node / Python 运行时下载)：
-          </label>
-          <input
-            type="text"
-            value={form.mirror_url || ""}
-            onChange={(e) => setForm({ ...form, mirror_url: e.target.value })}
-            placeholder="例如: https://npmmirror.com/mirrors"
-            style={{
-              width: "100%",
-              padding: "8px 12px",
-              borderRadius: "var(--radius-md)",
-              border: "1px solid var(--border-subtle)",
-              backgroundColor: "var(--bg-input)",
-              color: "var(--text-primary)",
-              outline: "none",
-            }}
-          />
-        </div>
+      {/* 3. 终端与 Shims 激活管理 */}
+      <SettingsTerminalCard
+        envStatus={envStatus}
+        onRefreshActivation={() => {
+          onRefreshAll();
+          showToast?.("PowerShell 激活状态已重新检测", "success");
+        }}
+        onSyncShims={() =>
+          onRunMiseCommand("同步 Shims 垫片到系统 PATH", async () => {
+            const res = await TauriService.addShimsToUserPath();
+            showToast?.("Shims 垫片已成功加入用户 PATH", "success");
+            return res;
+          })
+        }
+        onApplyPwsh={() =>
+          onRunMiseCommand("向 PowerShell Profile 写入动态 Hook 脚本", async () => {
+            const res = await TauriService.applyPwshProfile();
+            showToast?.("PowerShell Profile 激活脚本已成功写入", "success");
+            return res;
+          })
+        }
+        onRemovePwsh={() =>
+          onRunMiseCommand("从 PowerShell Profile 中移除 Hook 激活脚本", async () => {
+            const res = await TauriService.removePwshProfile();
+            showToast?.("PowerShell Profile 激活脚本已移除", "info");
+            return res;
+          })
+        }
+      />
 
-        {/* 窗口与托盘行为 */}
-        <div style={{ marginTop: 8, padding: "14px", backgroundColor: "var(--bg-card)", borderRadius: "var(--radius-md)", border: "1px solid var(--border-subtle)" }}>
-          <div style={{ fontWeight: 600, fontSize: 13.5, marginBottom: 6 }}>
-            🗔 窗口控制与系统托盘行为
-          </div>
-          <div style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 12 }}>
-            点击主窗口右上角关闭按钮（X）时的默认行为：
-          </div>
-          <div style={{ display: "flex", gap: 16, flexWrap: "wrap", fontSize: 13, marginBottom: 10 }}>
-            <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
-              <input
-                type="radio"
-                name="closeAction"
-                value="ask"
-                checked={closeAction === "ask"}
-                onChange={() => {
-                  setCloseAction("ask");
-                  TauriService.setCloseAction("ask");
-                }}
-              />
-              <span>每次询问（弹窗提示）</span>
-            </label>
-            <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
-              <input
-                type="radio"
-                name="closeAction"
-                value="tray"
-                checked={closeAction === "tray"}
-                onChange={() => {
-                  setCloseAction("tray");
-                  TauriService.setCloseAction("tray");
-                }}
-              />
-              <span>最小化到托盘（不在任务栏显示）</span>
-            </label>
-            <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
-              <input
-                type="radio"
-                name="closeAction"
-                value="quit"
-                checked={closeAction === "quit"}
-                onChange={() => {
-                  setCloseAction("quit");
-                  TauriService.setCloseAction("quit");
-                }}
-              />
-              <span>直接退出程序</span>
-            </label>
-          </div>
-          <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
-            * 点击窗口最小化按钮（_）时，窗口将直接缩小至系统托盘，不再占用任务栏空间。
-          </div>
-        </div>
+      {/* 4. 运行时行为与自动安装配置 + 缓存管理双卡片 */}
+      <SettingsRuntimeCard
+        form={form}
+        marketCacheInfo={marketCacheInfo}
+        onChangeForm={(newForm) => {
+          setForm(newForm);
+          onSaveConfig(newForm);
+        }}
+        onRefreshConfig={() => {
+          onRefreshAll();
+          showToast?.("运行时设定已重新加载", "success");
+        }}
+        onInstallMissingTools={() =>
+          onRunMiseCommand("扫描并安装所有声明工具 (mise install)", async () => {
+            const res = await TauriService.exec(["install"]);
+            showToast?.("已完成缺失依赖扫描与安装", "success");
+            return res;
+          })
+        }
+        onRefreshMarketCache={() =>
+          onRunMiseCommand("全量拉取并同步官方工具市场注册表", async () => {
+            const list = await TauriService.syncMarketRegistry();
+            await fetchCacheInfo();
+            showToast?.(`市场工具已全量更新 (共 ${list.length} 款)`, "success");
+            return { success: true, output: `已成功同步全量 ${list.length} 个工具` };
+          })
+        }
+        onClearMarketCache={() =>
+          onRunMiseCommand("清除本地工具市场缓存", async () => {
+            const res = await TauriService.clearMarketCache();
+            await fetchCacheInfo();
+            showToast?.("本地工具市场缓存已清除", "success");
+            return res;
+          })
+        }
+        onCleanMiseCache={() =>
+          onRunMiseCommand("清理 mise 下载缓存 (mise cache clear)", async () => {
+            const res = await TauriService.cleanMiseCache();
+            showToast?.("mise 临时下载缓存已清空，释放磁盘空间", "success");
+            return res;
+          })
+        }
+      />
 
-        <div style={{ display: "flex", gap: 24, marginTop: 4 }}>
-          <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 13 }}>
-            <input
-              type="checkbox"
-              checked={form.portable_mode}
-              onChange={(e) => setForm({ ...form, portable_mode: e.target.checked })}
-            />
-            便携绿色隔离模式 (数据随软件目录移动)
-          </label>
-        </div>
+      {/* 5. 窗口控制与系统托盘行为独立卡片 */}
+      <SettingsWindowCard
+        closeAction={closeAction}
+        onChangeCloseAction={(action) => {
+          setCloseAction(action);
+          TauriService.setCloseAction(action);
+          const labels = {
+            ask: "每次关闭时弹出确认提示",
+            tray: "关闭时自动缩小至系统托盘",
+            quit: "关闭时直接彻底退出程序",
+          };
+          showToast?.(`已将关闭窗口策略设为: ${labels[action]}`, "info");
+        }}
+      />
 
-        <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 8 }}>
-          <button className="btn btn-primary" onClick={handleSave}>
-            💾 保存配置
-          </button>
-          {savedTips && (
-            <span style={{ color: "var(--success-color)", fontSize: 13 }}>
-              ✓ 配置已成功持久化保存！
-            </span>
-          )}
-        </div>
-      </div>
+      {/* 6. 外观主题与现代调色盘 + 网络与代理 */}
+      <SettingsThemeProxyCard
+        form={form}
+        theme={theme}
+        onChangeForm={setForm}
+        onSetTheme={(t) => {
+          onSetTheme(t);
+          showToast?.(`已切换主题为: ${t === "dark" ? "深色模式" : "浅色模式"}`, "info");
+        }}
+        onSaveProxy={() => {
+          onSaveConfig(form);
+          showToast?.("代理与镜像源配置已保存", "success");
+        }}
+      />
 
-      {/* 关于信息卡片 */}
-      <div className="fluent-card">
-        <h3 style={{ fontSize: 15, fontWeight: 600, marginBottom: 8 }}>关于 mise-manager</h3>
-        <p style={{ color: "var(--text-secondary)", fontSize: 13, lineHeight: 1.8 }}>
-          架构版本: 2.0.0 (Tauri 2.x + Rust 原生底层 + Fluent Design)<br />
-          运行环境: Windows 11 / 10 x64<br />
-          开源协议: MIT License<br />
-          支持双轨打包：轻量便携版 + 内嵌 WebView2 离线安装完整版。
-        </p>
-      </div>
+      {/* 7. 关于应用与开源致敬 */}
+      <SettingsAboutCard
+        paths={paths}
+        onOpenExternal={onOpenExternal}
+        onCheckUpdate={() =>
+          onRunMiseCommand("检查 mise-manager 最新发行版", () =>
+            TauriService.openExternalUrl("https://github.com/kikock/mise-manager/releases")
+          )
+        }
+      />
     </div>
   );
 };

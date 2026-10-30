@@ -56,6 +56,16 @@ impl MiseRunner {
         app: Option<&AppHandle>,
         args: &[String],
     ) -> AppResult<ExecOutput> {
+        self.run_stream_in_dir(app, args, None).await
+    }
+
+    /// 异步流式执行 mise 命令，支持指定当前工作目录 (cwd)
+    pub async fn run_stream_in_dir(
+        &self,
+        app: Option<&AppHandle>,
+        args: &[String],
+        cwd: Option<&str>,
+    ) -> AppResult<ExecOutput> {
         let paths = ConfigManager::resolve_paths();
         let envs = ConfigManager::build_mise_env();
 
@@ -65,6 +75,12 @@ impl MiseRunner {
         let mut cmd = Command::new(&paths.exe_path);
         cmd.args(args);
         cmd.envs(envs);
+
+        if let Some(dir) = cwd {
+            if !dir.trim().is_empty() {
+                cmd.current_dir(dir.trim());
+            }
+        }
 
         #[cfg(target_os = "windows")]
         {
@@ -193,6 +209,24 @@ impl MiseRunner {
                 }
             }
         }
+        Ok(list)
+    }
+
+    /// 查询远程工具所有可用版本 (mise ls-remote <tool>)
+    pub async fn list_remote_versions(&self, tool: &str) -> AppResult<Vec<String>> {
+        let args = vec!["ls-remote".to_string(), tool.to_string()];
+        let res = self.run_stream(None, &args).await?;
+        if !res.success {
+            return Ok(Vec::new());
+        }
+        let mut list: Vec<String> = res
+            .output
+            .lines()
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
+            .collect();
+        // 倒序排列（最新版本排在前面）
+        list.reverse();
         Ok(list)
     }
 }

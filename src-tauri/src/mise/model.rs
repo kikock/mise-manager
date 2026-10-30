@@ -9,6 +9,12 @@ pub struct AppConfig {
     pub theme: String,
     pub close_to_tray: bool,
     pub auto_start: bool,
+    #[serde(default = "default_close_action")]
+    pub close_action: String,
+}
+
+fn default_close_action() -> String {
+    "ask".to_string()
 }
 
 impl Default for AppConfig {
@@ -21,6 +27,7 @@ impl Default for AppConfig {
             theme: "dark".to_string(),
             close_to_tray: true,
             auto_start: false,
+            close_action: "ask".to_string(),
         }
     }
 }
@@ -54,13 +61,25 @@ pub struct PluginMarketItem {
     pub is_installed: bool,
     pub installed_version: Option<String>,
     pub popular: bool,
+    #[serde(default)]
+    pub latest_version: Option<String>,
+    #[serde(default)]
+    pub versions_count: Option<u32>,
+    #[serde(default)]
+    pub updated_at: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SystemEnvStatus {
     pub path_has_shims: bool,
+    pub path_has_bin: bool,
+    pub env_data_dir_ok: bool,
+    pub env_bin_dir_ok: bool,
+    pub pwsh_profile_active: bool,
     pub shims_dir: String,
+    pub mise_bin_dir: String,
     pub mise_data_dir: String,
+    pub app_dir: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -69,3 +88,19 @@ pub struct ExecOutput {
     pub output: String,
     pub code: Option<i32>,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MiseCandidate {
+    pub path: String,
+    pub version: String,
+    pub is_current: bool,
+    pub location_type: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MarketCacheInfo {
+    pub exists: bool,
+    pub count: usize,
+    pub updated_at: Option<String>,
+}
+
