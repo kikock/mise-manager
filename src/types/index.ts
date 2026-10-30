@@ -58,10 +58,12 @@ export interface SystemEnvStatus {
   path_has_bin?: boolean;
   env_data_dir_ok?: boolean;
   env_bin_dir_ok?: boolean;
+  env_config_dir_ok?: boolean;
   pwsh_profile_active?: boolean;
   shims_dir: string;
   mise_data_dir: string;
   mise_bin_dir?: string;
+  mise_config_dir?: string;
   app_dir?: string;
 }
 

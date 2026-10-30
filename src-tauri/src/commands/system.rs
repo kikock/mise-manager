@@ -52,6 +52,8 @@ pub async fn check_system_env() -> AppResult<SystemEnvStatus> {
     let mut has_bin = false;
     let mut env_data_ok = false;
     let mut env_bin_ok = false;
+    let mut env_config_ok = false;
+    let config_dir = Path::new(&paths.root_dir).join("config").to_string_lossy().to_string();
 
     #[cfg(target_os = "windows")]
     {
@@ -70,6 +72,9 @@ pub async fn check_system_env() -> AppResult<SystemEnvStatus> {
             }
             if let Ok(b_val) = env.get_value::<String, _>("MISE_BIN_DIR") {
                 if b_val.eq_ignore_ascii_case(&paths.shims_dir) { env_bin_ok = true; }
+            }
+            if let Ok(c_val) = env.get_value::<String, _>("MISE_CONFIG_DIR") {
+                if c_val.eq_ignore_ascii_case(&config_dir) { env_config_ok = true; }
             }
         }
     }
@@ -92,10 +97,12 @@ pub async fn check_system_env() -> AppResult<SystemEnvStatus> {
         path_has_bin: has_bin,
         env_data_dir_ok: env_data_ok,
         env_bin_dir_ok: env_bin_ok,
+        env_config_dir_ok: env_config_ok,
         pwsh_profile_active: pwsh_active,
         shims_dir: paths.shims_dir,
         mise_bin_dir: Path::new(&paths.root_dir).join("bin").to_string_lossy().to_string(),
         mise_data_dir: paths.data_dir,
+        mise_config_dir: config_dir,
         app_dir: paths.app_dir,
     })
 }
@@ -171,6 +178,7 @@ pub async fn apply_all_user_env() -> AppResult<bool> {
     let bin = Path::new(&paths.root_dir).join("bin").to_string_lossy().to_string();
     let shims = paths.shims_dir.clone();
     let data = paths.data_dir.clone();
+    let config = Path::new(&paths.root_dir).join("config").to_string_lossy().to_string();
 
     #[cfg(target_os = "windows")]
     {
@@ -184,6 +192,7 @@ pub async fn apply_all_user_env() -> AppResult<bool> {
         // 写入独立环境变量
         let _ = env.set_value("MISE_DATA_DIR", &data);
         let _ = env.set_value("MISE_BIN_DIR", &shims);
+        let _ = env.set_value("MISE_CONFIG_DIR", &config);
 
         // 写入 Path (shims 与 bin)
         let old_path = env.get_value::<String, _>("Path").unwrap_or_default();
@@ -224,6 +233,7 @@ pub async fn remove_all_user_env() -> AppResult<bool> {
         if let Ok(env) = hkcu.open_subkey_with_flags("Environment", KEY_ALL_ACCESS) {
             let _ = env.delete_value("MISE_DATA_DIR");
             let _ = env.delete_value("MISE_BIN_DIR");
+            let _ = env.delete_value("MISE_CONFIG_DIR");
 
             let old_path = env.get_value::<String, _>("Path").unwrap_or_default();
             let path_parts: Vec<String> = old_path

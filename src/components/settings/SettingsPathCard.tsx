@@ -292,6 +292,7 @@ export const SettingsPathCard: React.FC<SettingsPathCardProps> = ({
           <div>应用 运行根目录 = <span style={{ color: "#e4e4e7" }}>{appDir}</span></div>
           <div>MISE 统一主目录 = <span style={{ color: "#38bdf8" }}>{rootDir}</span></div>
           <div>MISE_DATA_DIR = <span style={{ color: "#38bdf8" }}>{dataDir}</span></div>
+          <div>MISE_CONFIG_DIR = <span style={{ color: "#38bdf8" }}>{rootDir ? `${rootDir}\\config` : ""}</span></div>
           <div>MISE_BIN_DIR = <span style={{ color: "#38bdf8" }}>{binDir}</span></div>
           <div>mise 实际入口 = <span style={{ color: "#4ade80" }}>{exePath}</span></div>
         </div>

@@ -1,6 +1,6 @@
 [package]
 name = "mise-manager"
-version = "2.0.1"
+version = "2.0.2"
 description = "Windows 11 风格的 mise 版本管理器桌面应用"
 authors = ["caokui <34462958@qq.com>"]
 edition = "2021"

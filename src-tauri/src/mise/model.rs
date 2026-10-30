@@ -75,10 +75,12 @@ pub struct SystemEnvStatus {
     pub path_has_bin: bool,
     pub env_data_dir_ok: bool,
     pub env_bin_dir_ok: bool,
+    pub env_config_dir_ok: bool,
     pub pwsh_profile_active: bool,
     pub shims_dir: String,
     pub mise_bin_dir: String,
     pub mise_data_dir: String,
+    pub mise_config_dir: String,
     pub app_dir: String,
 }
 
