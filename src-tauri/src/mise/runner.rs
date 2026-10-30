@@ -194,14 +194,22 @@ impl MiseRunner {
                         for v in arr {
                             let ver = v.get("version").and_then(|x| x.as_str()).unwrap_or("");
                             let active = v.get("active").and_then(|x| x.as_bool()).unwrap_or(false);
-                            let install_path = v.get("install_path").and_then(|x| x.as_str()).map(|s| s.to_string());
+                            let raw_path = v.get("install_path").and_then(|x| x.as_str()).map(|s| s.to_string());
+                            let mut final_path = raw_path;
+                            // 若底层给出的路径为 i\vfox-... 等哈希包，优先检查标准统一路径 data\installs\<name>\<version>
+                            let paths = crate::mise::ConfigManager::resolve_paths();
+                            let std_install = std::path::PathBuf::from(&paths.data_dir).join("installs").join(name).join(ver);
+                            if std_install.exists() {
+                                final_path = Some(std_install.to_string_lossy().to_string());
+                            }
+
                             if !ver.is_empty() {
                                 list.push(InstalledTool {
                                     name: name.clone(),
                                     version: ver.to_string(),
                                     is_active: active,
                                     is_global: active,
-                                    path: install_path,
+                                    path: final_path,
                                 });
                             }
                         }

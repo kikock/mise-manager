@@ -23,8 +23,9 @@ export const UninstallModal: React.FC<UninstallModalProps> = ({
         left: 0,
         right: 0,
         bottom: 0,
-        backgroundColor: "rgba(0, 0, 0, 0.72)",
-        backdropFilter: "blur(10px)",
+        backgroundColor: "var(--modal-overlay-bg)",
+        backdropFilter: "blur(12px)",
+        WebkitBackdropFilter: "blur(12px)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
@@ -36,10 +37,10 @@ export const UninstallModal: React.FC<UninstallModalProps> = ({
         className="fluent-card"
         style={{
           width: 500,
-          backgroundColor: "var(--bg-card, #202024)",
-          border: "1px solid rgba(239, 68, 68, 0.3)",
-          boxShadow: "0 24px 56px rgba(0, 0, 0, 0.75)",
-          borderRadius: 12,
+          backgroundColor: "var(--modal-card-bg)",
+          border: "1px solid var(--modal-card-border)",
+          boxShadow: "var(--modal-card-shadow)",
+          borderRadius: 14,
           padding: 24,
         }}
         onClick={(e) => e.stopPropagation()}

@@ -39,8 +39,9 @@ export const SelectMiseModal: React.FC<SelectMiseModalProps> = ({
         left: 0,
         right: 0,
         bottom: 0,
-        backgroundColor: "rgba(0, 0, 0, 0.72)",
-        backdropFilter: "blur(10px)",
+        backgroundColor: "var(--modal-overlay-bg)",
+        backdropFilter: "blur(12px)",
+        WebkitBackdropFilter: "blur(12px)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
@@ -56,10 +57,10 @@ export const SelectMiseModal: React.FC<SelectMiseModalProps> = ({
           maxHeight: "85vh",
           display: "flex",
           flexDirection: "column",
-          backgroundColor: "var(--bg-card, #202024)",
-          border: "1px solid var(--border-subtle)",
-          boxShadow: "0 20px 48px rgba(0, 0, 0, 0.6)",
-          borderRadius: 12,
+          backgroundColor: "var(--modal-card-bg)",
+          border: "1px solid var(--modal-card-border)",
+          boxShadow: "var(--modal-card-shadow)",
+          borderRadius: 14,
           padding: 24,
         }}
         onClick={(e) => e.stopPropagation()}
@@ -103,12 +104,13 @@ export const SelectMiseModal: React.FC<SelectMiseModalProps> = ({
                 style={{
                   padding: "12px 14px",
                   borderRadius: "var(--radius-sm)",
-                  border: cand.is_current ? "1px solid var(--accent-color)" : "1px solid var(--border-subtle)",
-                  backgroundColor: cand.is_current ? "rgba(37, 99, 235, 0.08)" : "rgba(255, 255, 255, 0.02)",
+                  border: cand.is_current ? "1px solid var(--accent-color)" : "1px solid var(--modal-item-border)",
+                  backgroundColor: cand.is_current ? "rgba(37, 99, 235, 0.08)" : "var(--modal-item-bg)",
                   display: "flex",
                   justifyContent: "space-between",
                   alignItems: "center",
                   gap: 12,
+                  transition: "all var(--transition-fast)",
                 }}
               >
                 <div style={{ flex: 1, minWidth: 0 }}>

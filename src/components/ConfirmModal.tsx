@@ -31,36 +31,41 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
         left: 0,
         right: 0,
         bottom: 0,
-        backgroundColor: "rgba(0, 0, 0, 0.65)",
-        backdropFilter: "blur(8px)",
+        backgroundColor: "var(--modal-overlay-bg)",
+        backdropFilter: "blur(12px)",
+        WebkitBackdropFilter: "blur(12px)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        zIndex: 999,
+        zIndex: 9999,
       }}
       onClick={onCancel}
     >
       <div
         className="fluent-card"
         style={{
-          width: 420,
-          backgroundColor: "var(--bg-card)",
-          boxShadow: "var(--shadow-lg)",
+          width: 440,
+          backgroundColor: "var(--modal-card-bg)",
+          border: "1px solid var(--modal-card-border)",
+          boxShadow: "var(--modal-card-shadow)",
+          borderRadius: 14,
+          padding: 24,
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 12 }}>
+        <h3 style={{ fontSize: 16.5, fontWeight: 700, marginBottom: 12, color: "var(--text-primary)" }}>
           {title}
         </h3>
-        <p style={{ color: "var(--text-secondary)", fontSize: 13, marginBottom: 20 }}>
+        <p style={{ color: "var(--text-secondary)", fontSize: 13, marginBottom: 24, lineHeight: 1.6 }}>
           {message}
         </p>
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
-          <button className="btn btn-secondary" onClick={onCancel}>
+          <button className="btn btn-secondary" style={{ padding: "7px 18px", fontSize: 13 }} onClick={onCancel}>
             {cancelText}
           </button>
           <button
             className={`btn ${isDanger ? "btn-danger" : "btn-primary"}`}
+            style={{ padding: "7px 20px", fontSize: 13 }}
             onClick={onConfirm}
           >
             {confirmText}

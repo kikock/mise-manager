@@ -110,8 +110,9 @@ export const ToolVersionModal: React.FC<ToolVersionModalProps> = ({
         left: 0,
         right: 0,
         bottom: 0,
-        backgroundColor: "rgba(0, 0, 0, 0.72)",
-        backdropFilter: "blur(10px)",
+        backgroundColor: "var(--modal-overlay-bg)",
+        backdropFilter: "blur(12px)",
+        WebkitBackdropFilter: "blur(12px)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
@@ -122,43 +123,58 @@ export const ToolVersionModal: React.FC<ToolVersionModalProps> = ({
       <div
         className="fluent-card"
         style={{
-          width: 520,
+          width: 530,
           maxWidth: "92vw",
           maxHeight: "88vh",
-          backgroundColor: "#161b26",
-          border: "1px solid rgba(255, 255, 255, 0.12)",
+          backgroundColor: "var(--modal-card-bg)",
+          border: "1px solid var(--modal-card-border)",
           borderRadius: 14,
-          padding: 22,
+          padding: 24,
           display: "flex",
           flexDirection: "column",
           gap: 16,
-          boxShadow: "0 20px 40px rgba(0,0,0,0.6)",
+          boxShadow: "var(--modal-card-shadow)",
         }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* 头部标题与关闭 */}
         <div>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <span style={{ fontSize: 24 }}>{getToolIcon(toolName)}</span>
+              <span style={{ fontSize: 26 }}>{getToolIcon(toolName)}</span>
               <span style={{ fontSize: 20, fontWeight: 700, color: "var(--text-primary)" }}>{toolName}</span>
             </div>
             <button
               onClick={onClose}
               style={{
+                width: 32,
+                height: 32,
+                borderRadius: "var(--radius-md)",
                 background: "transparent",
                 border: "none",
-                color: "var(--text-muted)",
-                fontSize: 18,
+                color: "var(--text-secondary)",
+                fontSize: 16,
                 cursor: "pointer",
-                padding: "4px 8px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                transition: "all var(--transition-fast)",
               }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = "var(--modal-item-hover)";
+                e.currentTarget.style.color = "var(--text-primary)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = "transparent";
+                e.currentTarget.style.color = "var(--text-secondary)";
+              }}
+              title="关闭弹窗"
             >
               ✕
             </button>
           </div>
 
-          <div style={{ fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.5, marginBottom: 12 }}>
+          <div style={{ fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.55, marginBottom: 14 }}>
             {pluginInfo?.description || `${toolName} 现代化开发工具与跨平台版本管理器运行时`}
           </div>
 
@@ -169,9 +185,10 @@ export const ToolVersionModal: React.FC<ToolVersionModalProps> = ({
                 fontSize: 11.5,
                 padding: "3px 10px",
                 borderRadius: 12,
-                backgroundColor: "rgba(37, 99, 235, 0.2)",
-                color: "#60a5fa",
+                backgroundColor: "rgba(37, 99, 235, 0.15)",
+                color: "var(--accent-color)",
                 fontWeight: 600,
+                border: "1px solid rgba(37, 99, 235, 0.25)",
               }}
             >
               最新: {latestVer}
@@ -181,9 +198,10 @@ export const ToolVersionModal: React.FC<ToolVersionModalProps> = ({
                 fontSize: 11.5,
                 padding: "3px 10px",
                 borderRadius: 12,
-                backgroundColor: "rgba(16, 185, 129, 0.2)",
-                color: "#34d399",
+                backgroundColor: "rgba(16, 185, 129, 0.15)",
+                color: "var(--success-color)",
                 fontWeight: 600,
+                border: "1px solid rgba(16, 185, 129, 0.25)",
               }}
             >
               稳定: {stableVer}
@@ -193,9 +211,10 @@ export const ToolVersionModal: React.FC<ToolVersionModalProps> = ({
                 fontSize: 11.5,
                 padding: "3px 10px",
                 borderRadius: 12,
-                backgroundColor: "rgba(255, 255, 255, 0.08)",
+                backgroundColor: "var(--modal-tag-bg)",
                 color: "var(--text-secondary)",
                 fontWeight: 500,
+                border: "1px solid var(--modal-item-border)",
               }}
             >
               版本数: {totalCount}
@@ -209,8 +228,9 @@ export const ToolVersionModal: React.FC<ToolVersionModalProps> = ({
                   fontSize: 11.5,
                   padding: "3px 10px",
                   borderRadius: 12,
-                  backgroundColor: "rgba(255, 255, 255, 0.06)",
-                  color: "#f87171",
+                  backgroundColor: "rgba(239, 68, 68, 0.1)",
+                  color: "#ef4444",
+                  border: "1px solid rgba(239, 68, 68, 0.25)",
                   textDecoration: "none",
                   display: "inline-flex",
                   alignItems: "center",
@@ -226,7 +246,7 @@ export const ToolVersionModal: React.FC<ToolVersionModalProps> = ({
         </div>
 
         {/* 可用版本列表标题 */}
-        <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>
+        <div style={{ fontSize: 13.5, fontWeight: 600, color: "var(--text-primary)" }}>
           可用版本列表
         </div>
 
@@ -273,14 +293,15 @@ export const ToolVersionModal: React.FC<ToolVersionModalProps> = ({
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "space-between",
-                    padding: "9px 14px",
+                    padding: "10px 14px",
                     borderRadius: 8,
-                    backgroundColor: isInstalled ? "rgba(37, 99, 235, 0.12)" : "rgba(255, 255, 255, 0.03)",
-                    border: isInstalled ? "1px solid rgba(37, 99, 235, 0.3)" : "1px solid rgba(255, 255, 255, 0.05)",
+                    backgroundColor: isInstalled ? "rgba(37, 99, 235, 0.08)" : "var(--modal-item-bg)",
+                    border: isInstalled ? "1px solid rgba(37, 99, 235, 0.3)" : "1px solid var(--modal-item-border)",
+                    transition: "all var(--transition-fast)",
                   }}
                 >
                   <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                    <span style={{ fontFamily: "monospace", fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>
+                    <span style={{ fontFamily: "monospace", fontSize: 13.5, fontWeight: 700, color: "var(--text-primary)" }}>
                       {ver}
                     </span>
                     {isStable && (
@@ -289,9 +310,10 @@ export const ToolVersionModal: React.FC<ToolVersionModalProps> = ({
                           fontSize: 10.5,
                           padding: "1px 6px",
                           borderRadius: 4,
-                          backgroundColor: "rgba(16, 185, 129, 0.2)",
-                          color: "#34d399",
+                          backgroundColor: "rgba(16, 185, 129, 0.15)",
+                          color: "var(--success-color)",
                           fontWeight: 600,
+                          border: "1px solid rgba(16, 185, 129, 0.25)",
                         }}
                       >
                         稳定
@@ -303,9 +325,10 @@ export const ToolVersionModal: React.FC<ToolVersionModalProps> = ({
                           fontSize: 10.5,
                           padding: "1px 6px",
                           borderRadius: 4,
-                          backgroundColor: "rgba(16, 185, 129, 0.15)",
-                          color: "#34d399",
-                          fontWeight: 500,
+                          backgroundColor: "rgba(37, 99, 235, 0.15)",
+                          color: "var(--accent-color)",
+                          fontWeight: 600,
+                          border: "1px solid rgba(37, 99, 235, 0.25)",
                         }}
                       >
                         已安装
@@ -321,7 +344,7 @@ export const ToolVersionModal: React.FC<ToolVersionModalProps> = ({
                           style={{
                             fontSize: 11.5,
                             padding: "3px 10px",
-                            color: "#f87171",
+                            color: "#ef4444",
                             borderColor: "rgba(239, 68, 68, 0.3)",
                             backgroundColor: "rgba(239, 68, 68, 0.08)",
                           }}
@@ -334,8 +357,7 @@ export const ToolVersionModal: React.FC<ToolVersionModalProps> = ({
                           style={{
                             fontSize: 11.5,
                             padding: "3px 10px",
-                            backgroundColor: isDefault ? "rgba(255, 255, 255, 0.08)" : undefined,
-                            color: isDefault ? "var(--text-muted)" : undefined,
+                            opacity: isDefault ? 0.75 : 1,
                             cursor: isDefault ? "default" : "pointer",
                           }}
                           disabled={isDefault}
@@ -347,7 +369,7 @@ export const ToolVersionModal: React.FC<ToolVersionModalProps> = ({
                     ) : (
                       <button
                         className="btn btn-primary"
-                        style={{ fontSize: 11.5, padding: "3px 14px", backgroundColor: "#2563eb" }}
+                        style={{ fontSize: 11.5, padding: "3px 14px" }}
                         onClick={() => onInstall(toolName, ver)}
                       >
                         安装

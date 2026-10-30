@@ -34,6 +34,16 @@
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.2);
   --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.3);
   --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.45);
+
+  /* 暗色模态弹窗变量 (高对比度深色微晶质感) */
+  --modal-overlay-bg: rgba(0, 0, 0, 0.72);
+  --modal-card-bg: #1c1e28;
+  --modal-card-border: rgba(255, 255, 255, 0.14);
+  --modal-card-shadow: 0 24px 60px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(255, 255, 255, 0.08);
+  --modal-item-bg: rgba(255, 255, 255, 0.04);
+  --modal-item-border: rgba(255, 255, 255, 0.08);
+  --modal-item-hover: rgba(255, 255, 255, 0.08);
+  --modal-tag-bg: rgba(255, 255, 255, 0.08);
 }
 
 [data-theme="light"] {
@@ -46,9 +56,9 @@
   --border-subtle: rgba(0, 0, 0, 0.08);
   --border-strong: rgba(0, 0, 0, 0.14);
 
-  --text-primary: #1e2025;
-  --text-secondary: #4b5563;
-  --text-muted: #8b949e;
+  --text-primary: #111827;
+  --text-secondary: #374151;
+  --text-muted: #6b7280;
 
   --accent-color: #2563eb;
   --accent-hover: #1d4ed8;
@@ -58,6 +68,16 @@
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.04);
   --shadow-md: 0 4px 14px rgba(0, 0, 0, 0.06), 0 1px 3px rgba(0, 0, 0, 0.03);
   --shadow-lg: 0 10px 30px rgba(0, 0, 0, 0.08);
+
+  /* 浅色模态弹窗变量 (现代Fluent亚克力纯净明亮风格) */
+  --modal-overlay-bg: rgba(0, 0, 0, 0.42);
+  --modal-card-bg: #ffffff;
+  --modal-card-border: rgba(0, 0, 0, 0.12);
+  --modal-card-shadow: 0 24px 60px rgba(0, 0, 0, 0.18), 0 4px 16px rgba(0, 0, 0, 0.06);
+  --modal-item-bg: #f8fafc;
+  --modal-item-border: rgba(0, 0, 0, 0.06);
+  --modal-item-hover: #f1f5f9;
+  --modal-tag-bg: rgba(0, 0, 0, 0.05);
 }
 
 * {
