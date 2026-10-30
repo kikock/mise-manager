@@ -28,17 +28,17 @@ export const TerminalDrawer: React.FC<TerminalDrawerProps> = ({
   if (!isOpen) return null;
 
   const renderLogLine = (log: string, idx: number) => {
-    let color = "#e6edf3";
+    let color = "var(--terminal-log-default)";
     if (log.includes("[开始执行]") || log.includes("[INFO]")) {
-      color = "#60a5fa";
+      color = "var(--terminal-log-info)";
     } else if (log.includes("[EXEC]")) {
-      color = "#fbbf24";
+      color = "var(--terminal-log-exec)";
     } else if (log.includes("[执行成功]") || log.includes("[SUCCESS]")) {
-      color = "#34d399";
+      color = "var(--terminal-log-success)";
     } else if (log.includes("[执行失败]") || log.includes("[ERROR]") || log.includes("[异常中断]")) {
-      color = "#f87171";
+      color = "var(--terminal-log-error)";
     } else if (log.includes("[PROGRESS") || log.includes("[SCAN]")) {
-      color = "#38bdf8";
+      color = "var(--terminal-log-scan)";
     }
 
     return (
@@ -52,9 +52,9 @@ export const TerminalDrawer: React.FC<TerminalDrawerProps> = ({
     <div className="terminal-drawer">
       <div className="terminal-header">
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <span style={{ fontSize: 13, fontWeight: 600, color: "#f0f6fc" }}>命令执行实时终端</span>
+          <span style={{ fontSize: 13, fontWeight: 600, color: "var(--terminal-header-text)" }}>命令执行实时终端</span>
           {isRunning && (
-            <span style={{ color: "#fbbf24", fontSize: 12 }}>
+            <span style={{ color: "var(--terminal-log-exec)", fontSize: 12 }}>
               ● 正在执行中...
             </span>
           )}

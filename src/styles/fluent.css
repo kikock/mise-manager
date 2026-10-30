@@ -293,44 +293,44 @@ body {
   gap: 16px;
 }
 
-/* 底部内嵌终端面板 (IDE 风格流式布局，绝不遮挡上层任何内容) */
+/* 底部内嵌终端面板 (IDE 风格流式布局，自适应暗黑与浅色模式) */
 .terminal-drawer {
   height: 250px;
   max-height: 42vh;
   flex-shrink: 0;
-  background-color: #0d1117;
-  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  background-color: var(--terminal-bg, #0d1117);
+  border-top: 1px solid var(--terminal-border, rgba(255, 255, 255, 0.12));
   display: flex;
   flex-direction: column;
-  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.25);
-  transition: height var(--transition-fast);
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.15);
+  transition: height var(--transition-fast), background-color var(--transition-fast);
 }
 
 .terminal-header {
   height: 38px;
   min-height: 38px;
   padding: 0 16px;
-  background-color: #161b22;
+  background-color: var(--terminal-header-bg, #161b22);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  color: #f0f6fc;
+  border-bottom: 1px solid var(--terminal-border, rgba(255, 255, 255, 0.08));
+  color: var(--terminal-header-text, #f0f6fc);
 }
 
 .terminal-header span {
-  color: #f0f6fc;
+  color: var(--terminal-header-text, #f0f6fc);
 }
 
 .terminal-header .btn {
-  background-color: rgba(255, 255, 255, 0.08);
-  color: #f0f6fc;
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  background-color: var(--terminal-btn-bg, rgba(255, 255, 255, 0.08));
+  color: var(--terminal-header-text, #f0f6fc);
+  border: 1px solid var(--terminal-btn-border, rgba(255, 255, 255, 0.15));
 }
 
 .terminal-header .btn:hover {
-  background-color: rgba(255, 255, 255, 0.15);
-  border-color: rgba(255, 255, 255, 0.3);
+  background-color: var(--terminal-btn-hover-bg, rgba(255, 255, 255, 0.15));
+  border-color: var(--terminal-btn-hover-border, rgba(255, 255, 255, 0.3));
 }
 
 .terminal-body {
@@ -339,11 +339,48 @@ body {
   overflow-y: auto;
   font-family: "Cascadia Code", "Fira Code", "Consolas", monospace;
   font-size: 12.5px;
-  color: #e6edf3;
+  color: var(--terminal-text, #e6edf3);
   line-height: 1.6;
   white-space: pre-wrap;
   user-select: text;
-  background-color: #0d1117;
+  background-color: var(--terminal-bg, #0d1117);
+}
+
+/* 暗色与浅色终端色彩变量 */
+:root {
+  --terminal-bg: #0d1117;
+  --terminal-header-bg: #161b22;
+  --terminal-header-text: #f0f6fc;
+  --terminal-border: rgba(255, 255, 255, 0.1);
+  --terminal-btn-bg: rgba(255, 255, 255, 0.08);
+  --terminal-btn-border: rgba(255, 255, 255, 0.15);
+  --terminal-btn-hover-bg: rgba(255, 255, 255, 0.15);
+  --terminal-btn-hover-border: rgba(255, 255, 255, 0.3);
+  --terminal-text: #e6edf3;
+  --terminal-log-default: #e6edf3;
+  --terminal-log-info: #60a5fa;
+  --terminal-log-exec: #fbbf24;
+  --terminal-log-success: #34d399;
+  --terminal-log-error: #f87171;
+  --terminal-log-scan: #38bdf8;
+}
+
+[data-theme="light"] {
+  --terminal-bg: #f8fafc;
+  --terminal-header-bg: #e2e8f0;
+  --terminal-header-text: #1e293b;
+  --terminal-border: rgba(0, 0, 0, 0.12);
+  --terminal-btn-bg: #ffffff;
+  --terminal-btn-border: rgba(0, 0, 0, 0.15);
+  --terminal-btn-hover-bg: #f1f5f9;
+  --terminal-btn-hover-border: rgba(0, 0, 0, 0.25);
+  --terminal-text: #0f172a;
+  --terminal-log-default: #1e293b;
+  --terminal-log-info: #0284c7;
+  --terminal-log-exec: #b45309;
+  --terminal-log-success: #059669;
+  --terminal-log-error: #dc2626;
+  --terminal-log-scan: #0891b2;
 }
 
 /* 自定义滚动条 */

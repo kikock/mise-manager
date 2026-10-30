@@ -48,11 +48,54 @@ pub async fn mise_uninstall_tool(
     tool: String,
     version: String,
 ) -> AppResult<ExecOutput> {
-    let args = vec![
-        "uninstall".to_string(),
-        format!("{}@{}", tool, version),
-    ];
-    runner.run_stream(Some(&app), &args).await
+    use tauri::Emitter;
+    let target = format!("{}@{}", tool, version);
+
+    // 1. 若全局或当前配置中仍引用此版本，执行 unuse 避免锁定
+    let unuse_args = vec!["unuse".to_string(), "-g".to_string(), target.clone()];
+    let _ = runner.run_stream(Some(&app), &unuse_args).await;
+
+    // 2. 执行 mise 官方卸载命令
+    let uninstall_args = vec!["uninstall".to_string(), target.clone()];
+    let output = runner.run_stream(Some(&app), &uninstall_args).await?;
+
+    // 3. 深度物理残留清理（包含 installs 目录链接以及 i/ 真实解压目录）
+    let paths = crate::mise::ConfigManager::resolve_paths();
+    let data_path = std::path::PathBuf::from(&paths.data_dir);
+
+    // (a) 检查并清理 installs/{tool}/{version}
+    let tool_installs_dir = data_path.join("installs").join(&tool).join(&version);
+    if tool_installs_dir.exists() {
+        let _ = app.emit("mise:stream", &format!(">> [物理深度清理] 正在清除安装链接: {}\n", tool_installs_dir.display()));
+        let _ = std::fs::remove_dir_all(&tool_installs_dir);
+    }
+
+    // (b) 检查并清理 i/ 目录中包含本工具与版本的底层解包数据 (.mise-install.toml)
+    let i_dir = data_path.join("i");
+    if i_dir.is_dir() {
+        if let Ok(entries) = std::fs::read_dir(&i_dir) {
+            for entry in entries.flatten() {
+                let sub_path = entry.path();
+                if sub_path.is_dir() {
+                    let install_toml = sub_path.join(".mise-install.toml");
+                    if install_toml.is_file() {
+                        if let Ok(content) = std::fs::read_to_string(&install_toml) {
+                            let match_tool = content.contains(&format!("requested_as = \"{}\"", tool))
+                                || content.contains(&format!("backend = \"vfox:jdx/vfox-{}\"", tool))
+                                || sub_path.file_name().and_then(|n| n.to_str()).map(|n| n.contains(&tool)).unwrap_or(false);
+                            let match_ver = content.contains(&format!("version = \"{}\"", version));
+                            if match_tool && match_ver {
+                                let _ = app.emit("mise:stream", &format!(">> [物理深度清理] 正在清除底层 i 缓存目录: {}\n", sub_path.display()));
+                                let _ = std::fs::remove_dir_all(&sub_path);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(output)
 }
 
 #[command]

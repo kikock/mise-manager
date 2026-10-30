@@ -146,25 +146,22 @@ jobs:
           $stdNsis = Get-ChildItem "src-tauri/target/release/bundle/nsis/mise-manager_*_x64-setup.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
           if ($stdNsis) {
             Copy-Item $stdNsis.FullName "release_artifacts/mise-manager-setup-$ver-x64.exe" -Force
-            Copy-Item $stdNsis.FullName "release_artifacts/mise-manager-setup-$ver.exe" -Force
           }
           $stdMsi = Get-ChildItem "src-tauri/target/release/bundle/msi/mise-manager_*_x64_*.msi" -ErrorAction SilentlyContinue | Select-Object -First 1
           if ($stdMsi) {
-            Copy-Item $stdMsi.FullName "release_artifacts/mise-manager-$ver.msi" -Force
+            Copy-Item $stdMsi.FullName "release_artifacts/mise-manager-$ver-x64.msi" -Force
           }
 
           # 收集内嵌离线完整版
           $offlineNsis = Get-ChildItem "src-tauri/target/release/bundle/nsis/mise-manager-full-offline_*_x64-setup.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
           if ($offlineNsis) {
             Copy-Item $offlineNsis.FullName "release_artifacts/mise-manager-setup-$ver-full-offline-x64.exe" -Force
-            Copy-Item $offlineNsis.FullName "release_artifacts/mise-manager-full-offline-setup-$ver.exe" -Force
           }
 
           # 收集免安装独立 exe 并压缩为 zip
           $rawExe = "src-tauri/target/release/mise-manager.exe"
           if (Test-Path $rawExe) {
             Copy-Item $rawExe "release_artifacts/mise-manager-portable-$ver-x64.exe" -Force
-            Copy-Item $rawExe "release_artifacts/mise-manager-portable-$ver.exe" -Force
             Compress-Archive -Path $rawExe -DestinationPath "release_artifacts/mise-manager-$ver-win-x64.zip" -Force
           }
 

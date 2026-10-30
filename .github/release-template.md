@@ -20,6 +20,7 @@
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | **`mise-manager-setup-__VERSION__-full-offline-x64.exe`** | Windows 10 / 11 | `x64` | **~150 MB** | **内网隔离机 / 纯离线环境 / 无 WebView2 系统** | **含 WebView2 离线完整版**（内置微软官方离线安装包，无网络或无 WebView2 环境 100% 自动静默安装可用） |
 | **`mise-manager-setup-__VERSION__-x64.exe`** | Windows 10 / 11 | `x64` | **~4 MB** | **日常标准联网电脑（推荐大多数用户首选）** | **官方标准安装包**（向导式安装，体积轻巧，带桌面/开始菜单快捷方式与卸载程序） |
+| **`mise-manager-__VERSION__-x64.msi`** | Windows 10 / 11 | `x64` | **~4 MB** | **企业域控 / GPO 静默推送 / Intune 集中分发** | **Windows Installer 官方 MSI 包**（支持标准 MSI 命令行静默部署） |
 | **`mise-manager-portable-__VERSION__-x64.exe`** | Windows 10 / 11 | `x64` | **~4 MB** | **U 盘随身携带 / 即插即用 / 临时检修调试** | **单文件免安装便携版**（双击即用，不写注册表，U 盘即插即用） |
 | **`mise-manager-__VERSION__-win-x64.zip`** | Windows 10 / 11 | `x64` | **~2 MB** | **自动化脚本分发 / 自定义工具目录 / CI 归档** | **绿色免安装压缩包**（解压到任意目录直接运行） |
 
