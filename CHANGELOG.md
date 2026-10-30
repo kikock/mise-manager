@@ -45,7 +45,8 @@
 - **Release 说明与流水线标准化**：
   - 升级 `.github/release-template.md`，构建全离线完整版、标准版、单文件便携版与绿色压缩包四大资产说明矩阵与选型指引；
   - 修复 `tauri.offline.conf.json` 中 WebView2 离线安装器配置与 CI 流水线触发机制；
-  - 修正 `.gitignore` 忽略模式，将 `mise/` 改为工作区根目录锚定 `/mise/` 与 `/src-tauri/mise/`，彻底杜绝源码目录 `src-tauri/src/mise/downloader.rs` 被误忽略导致的 CI 云端 `E0583` 编译失败问题。
+  - 修正 `.gitignore` 忽略模式，将 `mise/` 改为工作区根目录锚定 `/mise/` 与 `/src-tauri/mise/`，彻底杜绝源码目录 `src-tauri/src/mise/downloader.rs` 被误忽略导致的 CI 云端 `E0583` 编译失败问题；
+  - **安装向导视觉与本地化全面升级**：为 NSIS 安装器配置全套 Fluent Design 品牌视觉位图（`installer-sidebar.bmp` 欢迎侧边栏、`installer-header.bmp` 顶部横幅），集成包含 16~256px 全尺寸阵列的高保真专属应用图标（`installerIcon` / `uninstallerIcon`），彻底替换 NSIS 默认软盘电脑图与默认图标；配置 `SimpChinese` 简体中文语言支持，实现安装向导地道中文化与友好说明引导。
 
 ---
 
